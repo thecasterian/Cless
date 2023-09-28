@@ -57,8 +57,8 @@ namespace punct {
 
 struct OpenBracket {};
 struct CloseBracket {};
-struct OpenParen {};
-struct CloseParen {};
+struct OpenParenthesis {};
+struct CloseParenthesis {};
 struct OpenBrace {};
 struct CloseBrace {};
 struct Dot {};
@@ -168,8 +168,8 @@ using Token = std::variant<
     token::keyword::While,
     token::punct::OpenBracket,
     token::punct::CloseBracket,
-    token::punct::OpenParen,
-    token::punct::CloseParen,
+    token::punct::OpenParenthesis,
+    token::punct::CloseParenthesis,
     token::punct::OpenBrace,
     token::punct::CloseBrace,
     token::punct::Dot,
@@ -218,7 +218,6 @@ using Token = std::variant<
     token::CharacterConstant,
     token::StringLiteral>;
 std::string to_string(const Token& token);
-std::ostream& operator<<(std::ostream& os, const Token& token);
 
 struct TokenInfo {
     size_t line_no;
