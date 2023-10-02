@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "cless-core/types/token.h"
+#include "cless/core/types/token.h"
 
 using cless::core::types::to_string;
 
