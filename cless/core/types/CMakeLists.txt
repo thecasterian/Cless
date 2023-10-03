@@ -10,6 +10,7 @@ add_library(${TARGET} SHARED
     src/token.cpp
 )
 
+set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(${TARGET} PUBLIC
     ${CMAKE_SOURCE_DIR}/cless/core/types/include
 )
