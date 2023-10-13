@@ -1,10 +1,13 @@
 #include <iostream>
 
-#include "cless/core/types/token.h"
+#include "cless/front-end/file/file.h"
 
-using cless::core::types::to_string;
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <file>" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-int main(void) {
-    cless::core::types::Token x = cless::core::types::token::Identifier{"a"};
-    std::cout << to_string(x) << std::endl;
+    std::filesystem::path path = argv[1];
+    cless::fend::file::File f(path);
 }

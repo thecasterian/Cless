@@ -4,17 +4,20 @@
 #include <fstream>
 #include <sstream>
 
+#include "cless/core/types/exception.h"
+
 namespace cless::fend::file {
 
-File::File(const std::string& path) : path(path) {
+File::File(const std::filesystem::path& path) : path(path) {
     // Read whole file contents
     std::ifstream ifs(path);
     if (ifs) {
         std::stringstream buffer;
         buffer << ifs.rdbuf();
         contents = buffer.str();
+    } else {
+        throw core::types::Exception(std::format("Could not open file: {}", path.string()));
     }
-    // TODO: throw exception if file does not exist
 
     // Split into lines
     auto it = contents.begin();
@@ -26,12 +29,20 @@ File::File(const std::string& path) : path(path) {
     }
 }
 
-const std::string& File::getPath() const {
+const std::filesystem::path& File::getPath() const {
     return path;
 }
 
 const std::string& File::getContents() const {
     return contents;
+}
+
+std::size_t File::getNumLines() const {
+    return lines.size();
+}
+
+std::string_view File::getLine(std::size_t line_number) const {
+    return lines.at(line_number);
 }
 
 std::string::iterator File::begin() {

@@ -1,0 +1,12 @@
+#ifndef CLESS_CORE_CONFIGURE_CONFIGURE_H
+#define CLESS_CORE_CONFIGURE_CONFIGURE_H
+
+#include <filesystem>
+
+namespace cless::configure {
+
+inline const std::filesystem::path root_path("${CMAKE_SOURCE_DIR}/cless");
+
+}
+
+#endif
