@@ -1,21 +1,23 @@
 cmake_minimum_required(VERSION 3.20)
 
-set(LIBRARY_NAME core)
-set(SUBLIBRARY_NAME types)
+set(LIBRARY_NAME front-end)
+set(SUBLIBRARY_NAME lexer)
 set(TARGET cless-${LIBRARY_NAME}-${SUBLIBRARY_NAME})
 set(TARGET_ALIAS cless::${LIBRARY_NAME}::${SUBLIBRARY_NAME})
 
 add_library(${TARGET} SHARED
-    include/cless/core/types/exception.h
-    include/cless/core/types/monadic.h
-    include/cless/core/types/token.h
-    src/token.cpp
+    include/cless/front-end/lexer/lexer_error.h
+    include/cless/front-end/lexer/lexer.h
+    src/lexer.cpp
+    include/cless/front-end/lexer/util.h
+    src/util.cpp
 )
 
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(${TARGET} PUBLIC
-    ${CMAKE_SOURCE_DIR}/cless/core/types/include
+    ${CMAKE_SOURCE_DIR}/cless/front-end/lexer/include
 )
 target_link_libraries(${TARGET} PUBLIC
+    cless::core::types
 )
 add_library(${TARGET_ALIAS} ALIAS ${TARGET})
