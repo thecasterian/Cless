@@ -21,7 +21,7 @@ target_link_libraries(${TARGET} PUBLIC
 add_library(${TARGET_ALIAS} ALIAS ${TARGET})
 
 add_executable(${TEST}
-    test/file.cpp
+    test/file_test.cpp
 )
 target_link_libraries(${TEST} PRIVATE
     GTest::gtest_main

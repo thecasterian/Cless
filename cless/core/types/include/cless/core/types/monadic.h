@@ -5,6 +5,8 @@
 #include <string>
 #include <variant>
 
+#include "cless/core/types/exception.h"
+
 namespace cless::core::types {
 
 // MaybeEither = Just ValueType | Nothing | Error ErrorType
@@ -34,8 +36,20 @@ public:
     bool isNothing() const { return std::holds_alternative<std::monostate>(value); }
     bool isError() const { return std::holds_alternative<ErrorType>(value); }
 
-    ValueType getJust() const { return std::get<ValueType>(value); }
-    ErrorType getError() const { return std::get<ErrorType>(value); }
+    ValueType getJust() const {
+        if (isNothing())
+            throw Exception("MaybeEither::getJust() called on Nothing");
+        else if (isError())
+            throw Exception("MaybeEither::getJust() called on Error");
+        return std::get<ValueType>(value);
+    }
+    ErrorType getError() const {
+        if (isJust())
+            throw Exception("MaybeEither::getError() called on Just");
+        else if (isNothing())
+            throw Exception("MaybeEither::getError() called on Nothing");
+        return std::get<ErrorType>(value);
+    }
 
 private:
     MaybeEither() : value(std::monostate()) {}

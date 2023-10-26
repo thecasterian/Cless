@@ -3,9 +3,7 @@
 
 #include <vector>
 
-#include "cless/core/types/monadic.h"
-#include "cless/core/types/token.h"
-#include "cless/front-end/lexer/lexer_error.h"
+#include "cless/front-end/lexer/data.h"
 
 namespace cless::fend::lexer {
 
