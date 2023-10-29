@@ -59,3 +59,65 @@ TEST(cless_front_end_lexer, integer_constant) {
     ASSERT_EQ(tokens.at(16).type, TokenType::IntegerConstant);
     ASSERT_EQ(tokens.at(16).str, "056");
 }
+
+TEST(cless_front_end_lexer, floating_constant) {
+    std::filesystem::path path = root_path / "test-data/floating_constant.c";
+    File f(path);
+
+    auto tokens = cless::fend::lexer::lex(f.getContents()).getJust();
+
+    ASSERT_EQ(tokens.at(6).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(6).str, "0.");
+
+    ASSERT_EQ(tokens.at(8).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(8).str, ".1f");
+
+    ASSERT_EQ(tokens.at(10).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(10).str, "23.7145F");
+
+    ASSERT_EQ(tokens.at(12).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(12).str, "1e3L");
+
+    ASSERT_EQ(tokens.at(14).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(14).str, ".53E+47l");
+
+    ASSERT_EQ(tokens.at(16).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(16).str, "6.e-18");
+
+    ASSERT_EQ(tokens.at(18).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(18).str, "0xB51.fa3Fd9ep+17f");
+
+    ASSERT_EQ(tokens.at(20).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(20).str, "0x25P-126");
+
+    ASSERT_EQ(tokens.at(22).type, TokenType::FloatingConstant);
+    ASSERT_EQ(tokens.at(22).str, "0x1p1l");
+}
+
+TEST(cless_front_end_lexer, character_constant) {
+    std::filesystem::path path = root_path / "test-data/character_constant.c";
+    File f(path);
+
+    auto tokens = cless::fend::lexer::lex(f.getContents()).getJust();
+
+    ASSERT_EQ(tokens.at(6).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(6).str, "'a'");
+
+    ASSERT_EQ(tokens.at(8).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(8).str, "'\\b'");
+
+    ASSERT_EQ(tokens.at(10).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(10).str, "'a\\n\\tF\\v'");
+
+    ASSERT_EQ(tokens.at(12).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(12).str, "'\\0'");
+
+    ASSERT_EQ(tokens.at(14).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(14).str, "'x\\x012'");
+
+    ASSERT_EQ(tokens.at(16).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(16).str, "'\\5379'");
+
+    ASSERT_EQ(tokens.at(18).type, TokenType::CharacterConstant);
+    ASSERT_EQ(tokens.at(18).str, "'\\'\\\"\"?\"\\\'\\?\\\\'");
+}

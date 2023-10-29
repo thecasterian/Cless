@@ -1,6 +1,7 @@
 #include "cless/front-end/lexer/impl.h"
 
 #include <format>
+#include <iostream>
 #include <regex>
 
 namespace cless::fend::lexer::impl {
@@ -111,17 +112,64 @@ static const TokenTypeString punctuations[] = {
 };
 
 static const std::regex identifier_re("^[a-zA-Z_$][a-zA-Z0-9_$]*");
-static const std::regex integer_constant_dec_re("^[1-9][0-9]*(\\w*)");
+static const std::regex integer_constant_dec_hex_re("^[1-9][0-9]*(\\w*)|^0[xX][0-9a-fA-F]+(\\w*)");
 static const std::regex integer_constant_oct_re("^0[0-9]*(\\w*)");
-static const std::regex integer_constant_hex_re("^0[xX][0-9a-fA-F]+(\\w*)");
 static const std::vector<std::string> integer_constant_suffixes = {
     "",   "u",  "U",  "l",   "L",   "ll",  "LL",  "ul",  "uL",  "Ul",  "UL", "lu",
     "lU", "Lu", "LU", "ull", "uLL", "Ull", "ULL", "llu", "LLu", "llU", "LLU"};
+static const std::regex floating_constant_re(
+    "^(?:[0-9]*\\.[0-9]+|[0-9]+\\.)(?:[eE][+-]?[0-9]+)?(\\w*)|"
+    "^[0-9]+[eE][+-]?[0-9]+(\\w*)|"
+    "^0[xX](?:[0-9a-fA-F]*\\.[0-9a-fA-F]+|[0-9a-fA-F]+\\.?)[pP][+-]?[0-9]+(\\w*)");
+static const std::vector<std::string> floating_constant_suffixes = {"", "f", "F", "l", "L"};
+static const std::regex character_constant_re("^'([^'\\\\\\n]|\\\\.)*\\\\?");
+static const std::regex string_literal_re("^\"([^\"\\\\\\n]|\\\\.)*\\\\?");
 
 static bool isValidIntegerConstantSuffix(std::string_view str) {
-    for (const auto &postfix : integer_constant_suffixes)
-        if (str == postfix) return true;
+    for (const auto &suffix : integer_constant_suffixes)
+        if (str == suffix) return true;
     return false;
+}
+
+static bool isValidFloatingConstantSuffix(std::string_view str) {
+    for (const auto &suffix : floating_constant_suffixes)
+        if (str == suffix) return true;
+    return false;
+}
+
+static bool isSimpleEscapeSequence(char c) {
+    switch (c) {
+        case '\'':
+        case '"':
+        case '?':
+        case '\\':
+        case 'a':
+        case 'b':
+        case 'f':
+        case 'n':
+        case 'r':
+        case 't':
+        case 'v':
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool isOctalDigit(char c) {
+    switch (c) {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+            return true;
+        default:
+            return false;
+    }
 }
 
 LexerReturn keyword(std::string_view source) {
@@ -154,17 +202,7 @@ LexerReturn identifier(std::string_view source) {
 LexerReturn integerConstant(std::string_view source) {
     std::cmatch match;
 
-    if (std::regex_search(source.begin(), source.end(), match, integer_constant_dec_re)) {
-        auto str = std::string_view{source.begin() + match.position(), size_t(match.length())};
-        auto suffix = std::string_view{source.begin() + match.position(1), size_t(match.length(1))};
-        if (not isValidIntegerConstantSuffix(suffix))
-            return {
-                Result::error(LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix), suffix}),
-                source};
-        return {Result::just(Token{TokenType::IntegerConstant, str}), source.substr(match.length())};
-    }
-
-    if (std::regex_search(source.begin(), source.end(), match, integer_constant_hex_re)) {
+    if (std::regex_search(source.begin(), source.end(), match, integer_constant_dec_hex_re)) {
         auto str = std::string_view{source.begin() + match.position(), size_t(match.length())};
         auto suffix = std::string_view{source.begin() + match.position(1), size_t(match.length(1))};
         if (not isValidIntegerConstantSuffix(suffix))
@@ -194,15 +232,101 @@ LexerReturn integerConstant(std::string_view source) {
 }
 
 LexerReturn floatingConstant(std::string_view source) {
-    return {Result::error(LexerError{"not implemented", source}), source};
+    std::cmatch match;
+
+    if (std::regex_search(source.begin(), source.end(), match, floating_constant_re)) {
+        auto str = std::string_view{source.begin() + match.position(), size_t(match.length())};
+        auto suffix = std::string_view{source.begin() + match.position(1), size_t(match.length(1))};
+        if (not isValidFloatingConstantSuffix(suffix))
+            return {
+                Result::error(LexerError{std::format("invalid suffix \"{}\" on floating constant", suffix), suffix}),
+                source};
+        return {Result::just(Token{TokenType::FloatingConstant, str}), source.substr(match.length())};
+    }
+
+    return {Result::nothing(), source};
 }
 
 LexerReturn characterConstant(std::string_view source) {
-    return {Result::error(LexerError{"not implemented", source}), source};
+    std::cmatch match;
+
+    if (std::regex_search(source.begin(), source.end(), match, character_constant_re)) {
+        auto term_quote = source.begin() + match.position() + match.length();
+        if (term_quote == source.end() or *term_quote != '\'')
+            return {
+                Result::error(LexerError{
+                    "missing terminating ' character",
+                    std::string_view{source.begin() + match.position(), term_quote}}),
+                source};
+
+        for (auto it = source.begin() + match.position() + 1; it != term_quote; ++it) {
+            if (*it == '\\') {
+                ++it;
+                if (*it == 'u' or *it == 'U')
+                    return {
+                        Result::error(LexerError{
+                            "universal character names are not supported", std::string_view{it - 1, it + 1}}),
+                        source};
+                if (not isSimpleEscapeSequence(*it) and not isOctalDigit(*it) and *it != 'x')
+                    return {
+                        Result::error(LexerError{"unknown escape sequence", std::string_view{it - 1, it + 1}}), source};
+                if (*it == 'x') {
+                    ++it;
+                    if (not isxdigit(*it))
+                        return {
+                            Result::error(
+                                LexerError{"\\x used with no following hex digits", std::string_view{it - 2, it}}),
+                            source};
+                }
+            }
+        }
+
+        auto str = std::string_view{source.begin() + match.position(), term_quote + 1};
+        return {Result::just(Token{TokenType::CharacterConstant, str}), source.substr(str.size())};
+    }
+
+    return {Result::nothing(), source};
 }
 
 LexerReturn stringLiteral(std::string_view source) {
-    return {Result::error(LexerError{"not implemented", source}), source};
+    std::cmatch match;
+
+    if (std::regex_search(source.begin(), source.end(), match, string_literal_re)) {
+        auto term_quote = source.begin() + match.position() + match.length();
+        if (term_quote == source.end() or *term_quote != '"')
+            return {
+                Result::error(LexerError{
+                    "missing terminating \" character",
+                    std::string_view{source.begin() + match.position(), term_quote}}),
+                source};
+
+        for (auto it = source.begin() + match.position() + 1; it != term_quote; ++it) {
+            if (*it == '\\') {
+                ++it;
+                if (*it == 'u' or *it == 'U')
+                    return {
+                        Result::error(LexerError{
+                            "universal character names are not supported", std::string_view{it - 1, it + 1}}),
+                        source};
+                if (not isSimpleEscapeSequence(*it) and not isOctalDigit(*it) and *it != 'x')
+                    return {
+                        Result::error(LexerError{"unknown escape sequence", std::string_view{it - 1, it + 1}}), source};
+                if (*it == 'x') {
+                    ++it;
+                    if (not isxdigit(*it))
+                        return {
+                            Result::error(
+                                LexerError{"\\x used with no following hex digits", std::string_view{it - 2, it}}),
+                            source};
+                }
+            }
+        }
+
+        auto str = std::string_view{source.begin() + match.position(), term_quote + 1};
+        return {Result::just(Token{TokenType::StringLiteral, str}), source.substr(str.size())};
+    }
+
+    return {Result::nothing(), source};
 }
 
 }  // namespace cless::fend::lexer::impl

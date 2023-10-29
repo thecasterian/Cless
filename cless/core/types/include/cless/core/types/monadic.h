@@ -36,14 +36,14 @@ public:
     bool isNothing() const { return std::holds_alternative<std::monostate>(value); }
     bool isError() const { return std::holds_alternative<ErrorType>(value); }
 
-    ValueType getJust() const {
+    ValueType &getJust() {
         if (isNothing())
             throw Exception("MaybeEither::getJust() called on Nothing");
         else if (isError())
             throw Exception("MaybeEither::getJust() called on Error");
         return std::get<ValueType>(value);
     }
-    ErrorType getError() const {
+    ErrorType &getError() {
         if (isJust())
             throw Exception("MaybeEither::getError() called on Just");
         else if (isNothing())

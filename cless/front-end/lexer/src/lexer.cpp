@@ -17,12 +17,13 @@ static std::string_view discardWhiteSpaces(std::string_view source) {
 
 MaybeEither<std::vector<Token>, LexerError> lex(std::string_view source) {
     std::vector<Token> tokens;
+    // order matters
     std::vector<std::function<impl::LexerReturn(std::string_view)>> lexer_impls{
         impl::keyword,
-        impl::punctuation,
         impl::identifier,
-        impl::integerConstant,
         impl::floatingConstant,
+        impl::integerConstant,
+        impl::punctuation,
         impl::characterConstant,
         impl::stringLiteral};
 
