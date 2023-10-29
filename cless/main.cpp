@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "cless/front-end/file/file.h"
+#include "cless/front-end/lexer/lexer.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -10,4 +11,10 @@ int main(int argc, char *argv[]) {
 
     std::filesystem::path path = argv[1];
     cless::fend::file::File f(path);
+
+    auto tokens = cless::fend::lexer::lex(f.getContents());
+    if (tokens.isError()) {
+        std::cerr << tokens.getError().msg << std::endl;
+        return EXIT_FAILURE;
+    }
 }
