@@ -19,13 +19,14 @@ MaybeEither<std::vector<Token>, LexerError> lex(std::string_view source) {
     std::vector<Token> tokens;
     // order matters
     std::vector<std::function<impl::LexerReturn(std::string_view)>> lexer_impls{
+        impl::characterConstant,
+        impl::stringLiteral,
         impl::keyword,
         impl::identifier,
         impl::floatingConstant,
         impl::integerConstant,
         impl::punctuation,
-        impl::characterConstant,
-        impl::stringLiteral};
+    };
 
     source = discardWhiteSpaces(source);
 
