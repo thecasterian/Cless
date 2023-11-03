@@ -25,13 +25,15 @@ target_link_libraries(${TARGET} PUBLIC
 add_library(${TARGET_ALIAS} ALIAS ${TARGET})
 
 add_executable(${TEST}
-    test/lexer_test.cpp
+    test/character_constant_test.cpp
+    test/floating_constant_test.cpp
+    test/identifier_test.cpp
+    test/integer_constant_test.cpp
+    test/string_literal_test.cpp
 )
 target_link_libraries(${TEST} PRIVATE
     GTest::gtest_main
     ${TARGET}
-    cless::configure
-    cless::front-end::file
 )
 include(GoogleTest)
 gtest_discover_tests(${TEST})

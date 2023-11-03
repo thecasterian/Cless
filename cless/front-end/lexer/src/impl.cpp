@@ -123,8 +123,8 @@ static const std::regex floating_constant_re(
     "^(?:[0-9]*\\.[0-9]+|[0-9]+\\.)(?:[eE][+-]?[0-9]+)?(\\w*)|"
     "^[0-9]+[eE][+-]?[0-9]+(\\w*)|"
     "^0[xX](?:[0-9a-fA-F]*\\.[0-9a-fA-F]+|[0-9a-fA-F]+\\.?)[pP][+-]?[0-9]+(\\w*)");
-static const std::regex character_constant_re("^(\\w*)'([^'\\\\\\n]|\\\\.)*\\\\?");
-static const std::regex string_literal_re("^(\\w*)\"([^\"\\\\\\n]|\\\\.)*\\\\?");
+static const std::regex character_constant_re("^(\\w*)'((?:[^'\\\\\\n]|\\\\.)*)\\\\?");
+static const std::regex string_literal_re("^(\\w*)\"((?:[^\"\\\\\\n]|\\\\.)*)\\\\?");
 
 static bool isSimpleEscapeSequence(char c) {
     switch (c) {
