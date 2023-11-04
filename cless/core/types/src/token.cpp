@@ -1,5 +1,6 @@
 #include "cless/core/types/token.h"
 
+#include "cless/core/base/base.h"
 #include "cless/core/types/exception.h"
 
 namespace cless::core::types {
@@ -291,14 +292,74 @@ struct TokenToStringVisitor {
 
     std::string operator()(const Identifier& identifier) const { return std::string(identifier.name); }
 
-    std::string operator()(const IntegerConstant& integer_constant) const { return integer_constant.value; }
+    std::string operator()(const IntegerConstant& integer_constant) const {
+        return std::format("{}{}", integer_constant.value, toString(integer_constant.suffix));
+    }
 
-    std::string operator()(const FloatingConstant& floating_constant) const { return floating_constant.value; }
+    std::string operator()(const FloatingConstant& floating_constant) const {
+        return std::format("{}{}", floating_constant.value, toString(floating_constant.suffix));
+    }
 
-    std::string operator()(const CharacterConstant& character_constant) const { return character_constant.value; }
+    std::string operator()(const CharacterConstant& character_constant) const {
+        return std::format("{}'{}'", toString(character_constant.prefix), character_constant.value);
+    }
 
-    std::string operator()(const StringLiteral& string_literal) const { return string_literal.value; }
+    std::string operator()(const StringLiteral& string_literal) const {
+        return std::format("{}\"{}\"", toString(string_literal.prefix), string_literal.value);
+    }
 };
+
+bool Token::isKeyword() const {
+    return std::holds_alternative<Keyword>(*this);
+}
+
+bool Token::isKeyword(KeywordType type) const {
+    return std::holds_alternative<Keyword>(*this) and std::get<Keyword>(*this).type == type;
+}
+
+bool Token::isPunctuation() const {
+    return std::holds_alternative<Punctuation>(*this);
+}
+
+bool Token::isPunctuation(PunctuationType type) const {
+    return std::holds_alternative<Punctuation>(*this) and std::get<Punctuation>(*this).type == type;
+}
+
+bool Token::isIdentifier() const {
+    return std::holds_alternative<Identifier>(*this);
+}
+
+bool Token::isIntegerConstant() const {
+    return std::holds_alternative<IntegerConstant>(*this);
+}
+
+bool Token::isFloatingConstant() const {
+    return std::holds_alternative<FloatingConstant>(*this);
+}
+
+bool Token::isCharacterConstant() const {
+    return std::holds_alternative<CharacterConstant>(*this);
+}
+
+bool Token::isStringLiteral() const {
+    return std::holds_alternative<StringLiteral>(*this);
+}
+
+const char* Token::sourceBegin() const {
+    return std::visit(
+        base::Overloaded{
+            [](const StringLiteral& token) -> const char* { return token.sources.front().begin(); },
+            [](const auto& token) -> const char* { return token.source.begin(); }},
+        *this);
+}
+
+const char* Token::sourceEnd() const {
+    return std::visit(
+        base::Overloaded{
+            [](const StringLiteral& token) -> const char* { return token.sources.back().end(); },
+            [](const auto& token) -> const char* { return token.source.end(); }},
+        *this);
+}
 
 std::string toString(const Token& token) {
     return std::visit(TokenToStringVisitor{}, token);

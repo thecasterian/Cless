@@ -161,189 +161,172 @@ static bool isOctalDigit(char c) {
     }
 }
 
-LexerReturn keyword(std::string_view source) {
+LexerReturn keyword(std::string_view input) {
     for (auto &&[keyword_type, keyword_str] : keywords)
-        if (auto str = source.substr(0, keyword_str.size()); str == keyword_str)
-            return {Result::just(Keyword{keyword_type, str}), source.substr(keyword_str.size())};
+        if (auto source = input.substr(0, keyword_str.size()); source == keyword_str)
+            return {Result::just(Keyword{keyword_type, source}), input.substr(keyword_str.size())};
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
-LexerReturn punctuation(std::string_view source) {
+LexerReturn punctuation(std::string_view input) {
     for (auto &&[punct_type, punct_str] : punctuations)
-        if (auto str = source.substr(0, punct_str.size()); str == punct_str)
-            return {Result::just(Punctuation{punct_type, str}), source.substr(punct_str.size())};
+        if (auto source = input.substr(0, punct_str.size()); source == punct_str)
+            return {Result::just(Punctuation{punct_type, source}), input.substr(punct_str.size())};
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
-LexerReturn identifier(std::string_view source) {
+LexerReturn identifier(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(source.begin(), source.end(), match, identifier_re)) {
-        auto str = std::string_view(source.begin() + match.position(), size_t(match.length()));
-        std::string name(str.begin(), str.end());
-        return {Result::just(Identifier{name, str}), source.substr(match.length())};
+    if (std::regex_search(input.begin(), input.end(), match, identifier_re)) {
+        auto source = std::string_view(input.begin() + match.position(), size_t(match.length()));
+        std::string name(source.begin(), source.end());
+        return {Result::just(Identifier{name, source}), input.substr(match.length())};
     }
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
-LexerReturn integerConstant(std::string_view source) {
+LexerReturn integerConstant(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(source.begin(), source.end(), match, integer_constant_dec_hex_re)) {
-        auto str = std::string_view{source.begin() + match.position(), size_t(match.length())};
-        auto value = std::string(source.begin() + match.position(), source.begin() + match.position(1));
-        auto suffix_str = std::string_view{source.begin() + match.position(1), size_t(match.length(1))};
-        auto suffix = core::types::integerSuffixFromStr(std::string(suffix_str));
+    if (std::regex_search(input.begin(), input.end(), match, integer_constant_dec_hex_re)) {
+        auto source = std::string_view{input.begin() + match.position(), size_t(match.length())};
+        auto value = std::string(input.begin() + match.position(), input.begin() + match.position(1));
+        auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
+        auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
         if (not suffix.has_value())
             return {
                 Result::error(
-                    LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix_str), suffix_str}),
-                source};
-        return {Result::just(IntegerConstant{value, suffix.value(), str}), source.substr(match.length())};
+                    LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src}),
+                input};
+        return {Result::just(IntegerConstant{value, suffix.value(), source}), input.substr(match.length())};
     }
 
-    if (std::regex_search(source.begin(), source.end(), match, integer_constant_oct_re)) {
-        auto str = std::string_view{source.begin() + match.position(), size_t(match.length())};
-        auto value = std::string(source.begin() + match.position(), source.begin() + match.position(1));
-        auto suffix_str = std::string_view{source.begin() + match.position(1), size_t(match.length(1))};
-        auto suffix = core::types::integerSuffixFromStr(std::string(suffix_str));
-        for (auto it = str.begin(); it < suffix_str.begin(); it++)
+    if (std::regex_search(input.begin(), input.end(), match, integer_constant_oct_re)) {
+        auto source = std::string_view{input.begin() + match.position(), size_t(match.length())};
+        auto value = std::string(input.begin() + match.position(), input.begin() + match.position(1));
+        auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
+        auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
+        for (auto it = source.begin(); it < suffix_src.begin(); it++)
             if (*it == '8' or *it == '9')
                 return {
                     Result::error(LexerError{
                         std::format("invalid digit \"{}\" in octal constant", *it), std::string_view{it, it + 1}}),
-                    source};
+                    input};
         if (not suffix.has_value())
             return {
                 Result::error(
-                    LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix_str), suffix_str}),
-                source};
-        return {Result::just(IntegerConstant{value, suffix.value(), str}), source.substr(match.length())};
+                    LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src}),
+                input};
+        return {Result::just(IntegerConstant{value, suffix.value(), source}), input.substr(match.length())};
     }
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
-LexerReturn floatingConstant(std::string_view source) {
+LexerReturn floatingConstant(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(source.begin(), source.end(), match, floating_constant_re)) {
-        auto str = std::string_view{source.begin() + match.position(), size_t(match.length())};
-        auto value = std::string(source.begin() + match.position(), source.begin() + match.position(1));
-        auto suffix_str = std::string_view{source.begin() + match.position(1), size_t(match.length(1))};
-        auto suffix = core::types::floatingSuffixFromStr(std::string(suffix_str));
+    if (std::regex_search(input.begin(), input.end(), match, floating_constant_re)) {
+        auto source = std::string_view{input.begin() + match.position(), size_t(match.length())};
+        auto value = std::string(input.begin() + match.position(), input.begin() + match.position(1));
+        auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
+        auto suffix = core::types::floatingSuffixFromStr(std::string(suffix_src));
         if (not suffix.has_value())
             return {
                 Result::error(
-                    LexerError{std::format("invalid suffix \"{}\" on floating constant", suffix_str), suffix_str}),
-                source};
-        return {Result::just(FloatingConstant{value, suffix.value(), str}), source.substr(match.length())};
+                    LexerError{std::format("invalid suffix \"{}\" on floating constant", suffix_src), suffix_src}),
+                input};
+        return {Result::just(FloatingConstant{value, suffix.value(), source}), input.substr(match.length())};
     }
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
-LexerReturn characterConstant(std::string_view source) {
+static Result validateEscapeSequence(const std::string &value) {
+    for (auto it = value.begin(); it != value.end(); ++it) {
+        if (*it == '\\') {
+            ++it;
+            if (*it == 'u' or *it == 'U')
+                return Result::error(
+                    LexerError{"universal character names are not supported", std::string_view{it - 1, it + 1}});
+            if (not isSimpleEscapeSequence(*it) and not isOctalDigit(*it) and *it != 'x')
+                return Result::error(LexerError{"unknown escape sequence", std::string_view{it - 1, it + 1}});
+            if (*it == 'x') {
+                ++it;
+                if (not isxdigit(*it))
+                    return Result::error(
+                        LexerError{"\\x used with no following hex digits", std::string_view{it - 2, it}});
+            }
+        }
+    }
+
+    return Result::nothing();
+}
+
+LexerReturn characterConstant(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(source.begin(), source.end(), match, character_constant_re)) {
-        auto term_quote_pos = source.begin() + match.position() + match.length();
-        if (term_quote_pos == source.end() or *term_quote_pos != '\'')
+    if (std::regex_search(input.begin(), input.end(), match, character_constant_re)) {
+        auto term_quote_pos = input.begin() + match.position() + match.length();
+        if (term_quote_pos == input.end() or *term_quote_pos != '\'')
             return {
                 Result::error(LexerError{
                     "missing terminating ' character",
-                    std::string_view{source.begin() + match.position(), term_quote_pos}}),
-                source};
+                    std::string_view{input.begin() + match.position(), term_quote_pos}}),
+                input};
 
-        auto str = std::string_view{source.begin() + match.position(), term_quote_pos + 1};
-        auto value = std::string(source.begin() + match.position(2), size_t(match.length(2)));
-        auto prefix_str = std::string_view{source.begin() + match.position(), size_t(match.length(1))};
-        auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_str));
+        auto source = std::string_view{input.begin() + match.position(), term_quote_pos + 1};
+        auto value = std::string(input.begin() + match.position(2), size_t(match.length(2)));
+        auto prefix_src = std::string_view{input.begin() + match.position(), size_t(match.length(1))};
+        auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_src));
         if (not prefix.has_value())
             return {
                 Result::error(LexerError{
-                    std::format("invalid encoding prefix \"{}\" on character constant", prefix_str), prefix_str}),
-                source};
+                    std::format("invalid encoding prefix \"{}\" on character constant", prefix_src), prefix_src}),
+                input};
 
-        for (auto it = value.begin(); it != value.end(); ++it) {
-            if (*it == '\\') {
-                ++it;
-                if (*it == 'u' or *it == 'U')
-                    return {
-                        Result::error(LexerError{
-                            "universal character names are not supported", std::string_view{it - 1, it + 1}}),
-                        source};
-                if (not isSimpleEscapeSequence(*it) and not isOctalDigit(*it) and *it != 'x')
-                    return {
-                        Result::error(LexerError{"unknown escape sequence", std::string_view{it - 1, it + 1}}), source};
-                if (*it == 'x') {
-                    ++it;
-                    if (not isxdigit(*it))
-                        return {
-                            Result::error(
-                                LexerError{"\\x used with no following hex digits", std::string_view{it - 2, it}}),
-                            source};
-                }
-            }
-        }
+        auto valid = validateEscapeSequence(value);
+        if (valid.isError()) return {valid, input};
 
-        return {Result::just(CharacterConstant{value, prefix.value(), str}), source.substr(str.size())};
+        return {Result::just(CharacterConstant{value, prefix.value(), source}), input.substr(source.size())};
     }
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
-LexerReturn stringLiteral(std::string_view source) {
+LexerReturn stringLiteral(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(source.begin(), source.end(), match, string_literal_re)) {
-        auto term_quote_pos = source.begin() + match.position() + match.length();
-        if (term_quote_pos == source.end() or *term_quote_pos != '"')
+    if (std::regex_search(input.begin(), input.end(), match, string_literal_re)) {
+        auto term_quote_pos = input.begin() + match.position() + match.length();
+        if (term_quote_pos == input.end() or *term_quote_pos != '"')
             return {
                 Result::error(LexerError{
                     "missing terminating \" character",
-                    std::string_view{source.begin() + match.position(), term_quote_pos}}),
-                source};
+                    std::string_view{input.begin() + match.position(), term_quote_pos}}),
+                input};
 
-        auto str = std::string_view{source.begin() + match.position(), term_quote_pos + 1};
-        auto value = std::string(source.begin() + match.position(2), size_t(match.length(2)));
-        auto prefix_str = std::string_view{source.begin() + match.position(), size_t(match.length(1))};
-        auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_str));
+        auto source = std::string_view{input.begin() + match.position(), term_quote_pos + 1};
+        auto value = std::string(input.begin() + match.position(2), size_t(match.length(2)));
+        auto prefix_src = std::string_view{input.begin() + match.position(), size_t(match.length(1))};
+        auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_src));
         if (not prefix.has_value())
             return {
                 Result::error(LexerError{
-                    std::format("invalid encoding prefix \"{}\" on character constant", prefix_str), prefix_str}),
-                source};
+                    std::format("invalid encoding prefix \"{}\" on string literal", prefix_src), prefix_src}),
+                input};
 
-        for (auto it = value.begin(); it != value.end(); ++it) {
-            if (*it == '\\') {
-                ++it;
-                if (*it == 'u' or *it == 'U')
-                    return {
-                        Result::error(LexerError{
-                            "universal character names are not supported", std::string_view{it - 1, it + 1}}),
-                        source};
-                if (not isSimpleEscapeSequence(*it) and not isOctalDigit(*it) and *it != 'x')
-                    return {
-                        Result::error(LexerError{"unknown escape sequence", std::string_view{it - 1, it + 1}}), source};
-                if (*it == 'x') {
-                    ++it;
-                    if (not isxdigit(*it))
-                        return {
-                            Result::error(
-                                LexerError{"\\x used with no following hex digits", std::string_view{it - 2, it}}),
-                            source};
-                }
-            }
-        }
+        auto valid = validateEscapeSequence(value);
+        if (valid.isError()) return {valid, input};
 
-        return {Result::just(StringLiteral{value, prefix.value(), {str}}), source.substr(str.size())};
+        return {Result::just(StringLiteral{value, prefix.value(), {source}}), input.substr(source.size())};
     }
 
-    return {Result::nothing(), source};
+    return {Result::nothing(), input};
 }
 
 }  // namespace cless::fend::lexer::impl

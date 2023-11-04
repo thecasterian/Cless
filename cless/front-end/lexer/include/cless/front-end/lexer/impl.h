@@ -12,13 +12,13 @@ struct LexerReturn {
     std::string_view remainder;
 };
 
-LexerReturn keyword(std::string_view source);
-LexerReturn punctuation(std::string_view source);
-LexerReturn identifier(std::string_view source);
-LexerReturn integerConstant(std::string_view source);
-LexerReturn floatingConstant(std::string_view source);
-LexerReturn characterConstant(std::string_view source);
-LexerReturn stringLiteral(std::string_view source);
+LexerReturn keyword(std::string_view input);
+LexerReturn punctuation(std::string_view input);
+LexerReturn identifier(std::string_view input);
+LexerReturn integerConstant(std::string_view input);
+LexerReturn floatingConstant(std::string_view input);
+LexerReturn characterConstant(std::string_view input);
+LexerReturn stringLiteral(std::string_view input);
 
 }  // namespace cless::fend::lexer::impl
 

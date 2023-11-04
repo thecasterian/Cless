@@ -174,8 +174,29 @@ struct StringLiteral {
     std::vector<std::string_view> sources;
 };
 
-using Token =
-    std::variant<Keyword, Punctuation, Identifier, IntegerConstant, FloatingConstant, CharacterConstant, StringLiteral>;
+struct Token : public std::variant<
+                   Keyword,
+                   Punctuation,
+                   Identifier,
+                   IntegerConstant,
+                   FloatingConstant,
+                   CharacterConstant,
+                   StringLiteral> {
+    using variant::variant;
+
+    bool isKeyword() const;
+    bool isKeyword(KeywordType type) const;
+    bool isPunctuation() const;
+    bool isPunctuation(PunctuationType type) const;
+    bool isIdentifier() const;
+    bool isIntegerConstant() const;
+    bool isFloatingConstant() const;
+    bool isCharacterConstant() const;
+    bool isStringLiteral() const;
+
+    const char* sourceBegin() const;
+    const char* sourceEnd() const;
+};
 
 std::string toString(const Token& token);
 std::ostream& operator<<(std::ostream& os, const Token& token);
