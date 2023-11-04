@@ -2,16 +2,19 @@
 #define CLESS_CORE_TYPES_TOKEN_H
 
 #include <iostream>
+#include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace cless::core::types {
 
-enum class TokenType {
-    // Keywords
+enum class KeywordType {
+    Alignas,
+    Alignof,
     Auto,
-    Break,
     Bool,
+    Break,
     Case,
     Char,
     Complex,
@@ -22,17 +25,16 @@ enum class TokenType {
     Double,
     Else,
     Enum,
-    Extern,
+    False,
     Float,
     For,
     Generic,
-    Goto,
     If,
     Imaginary,
     Inline,
     Int,
     Long,
-    Register,
+    NullPtr,
     Restrict,
     Return,
     Short,
@@ -42,14 +44,22 @@ enum class TokenType {
     StaticAssert,
     Struct,
     Switch,
+    True,
     Typedef,
+    Typeof,
     Union,
     Unsigned,
     Void,
     Volatile,
     While,
+};
 
-    // Punctuations
+struct Keyword {
+    KeywordType type;
+    std::string_view source;
+};
+
+enum class PunctuationType {
     OpenBracket,
     CloseBracket,
     OpenParenthesis,
@@ -96,21 +106,100 @@ enum class TokenType {
     CaretEqual,
     VerticalBarEqual,
     Comma,
-
-    Identifier,
-    IntegerConstant,
-    FloatingConstant,
-    CharacterConstant,
-    StringLiteral,
 };
 
-struct Token {
-    TokenType type;
-    std::string_view str;
+struct Punctuation {
+    PunctuationType type;
+    std::string_view source;
 };
 
-std::string to_string(const Token& token);
-std::ostream &operator<<(std::ostream &os, const Token& token);
+struct Identifier {
+    std::string name;
+    std::string_view source;
+};
+
+enum class IntegerSuffix {
+    None,
+    Unsigned,
+    Long,
+    UnsignedLong,
+    LongLong,
+    UnsignedLongLong,
+};
+
+std::string toString(IntegerSuffix integer_suffix);
+std::optional<IntegerSuffix> integerSuffixFromStr(const std::string& str);
+
+struct IntegerConstant {
+    std::string value;
+    IntegerSuffix suffix;
+    std::string_view source;
+};
+
+enum class FloatingSuffix {
+    None,
+    Float,
+    LongDouble,
+};
+
+struct FloatingConstant {
+    std::string value;
+    FloatingSuffix suffix;
+    std::string_view source;
+};
+
+std::string toString(FloatingSuffix floating_suffix);
+std::optional<FloatingSuffix> floatingSuffixFromStr(const std::string& str);
+
+enum class EncodingPrefix {
+    None,
+    UTF8,
+    WChar,
+    Char16,
+    Char32,
+};
+
+std::string toString(EncodingPrefix encoding_prefix);
+std::optional<EncodingPrefix> encodingPrefixFromStr(const std::string& str);
+
+struct CharacterConstant {
+    std::string value;
+    EncodingPrefix prefix;
+    std::string_view source;
+};
+
+struct StringLiteral {
+    std::string value;
+    EncodingPrefix prefix;
+    std::vector<std::string_view> sources;
+};
+
+struct Token : public std::variant<
+                   Keyword,
+                   Punctuation,
+                   Identifier,
+                   IntegerConstant,
+                   FloatingConstant,
+                   CharacterConstant,
+                   StringLiteral> {
+    using variant::variant;
+
+    bool isKeyword() const;
+    bool isKeyword(KeywordType type) const;
+    bool isPunctuation() const;
+    bool isPunctuation(PunctuationType type) const;
+    bool isIdentifier() const;
+    bool isIntegerConstant() const;
+    bool isFloatingConstant() const;
+    bool isCharacterConstant() const;
+    bool isStringLiteral() const;
+
+    const char* sourceBegin() const;
+    const char* sourceEnd() const;
+};
+
+std::string toString(const Token& token);
+std::ostream& operator<<(std::ostream& os, const Token& token);
 
 }  // namespace cless::core::types
 

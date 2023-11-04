@@ -8,13 +8,13 @@
 using cless::configure::root_path;
 using cless::fend::file::File;
 
-TEST(cless_front_end_file, not_exist) {
+TEST(cless_fend_file, not_exist) {
     std::filesystem::path path = root_path / "test-data/not_exist.c";
 
     ASSERT_THROW({ File f(path); }, cless::core::types::Exception);
 }
 
-TEST(cless_front_end_file, empty_file) {
+TEST(cless_fend_file, empty_file) {
     std::filesystem::path path = root_path / "test-data/empty_file.c";
 
     File f(path);
@@ -23,7 +23,7 @@ TEST(cless_front_end_file, empty_file) {
     ASSERT_EQ(f.getNumLines(), 0);
 }
 
-TEST(cless_front_end_file, empty_main) {
+TEST(cless_fend_file, empty_main) {
     std::filesystem::path path = root_path / "test-data/empty_main.c";
 
     File f(path);
@@ -32,7 +32,7 @@ TEST(cless_front_end_file, empty_main) {
     ASSERT_EQ(f.getNumLines(), 1);
 }
 
-TEST(cless_front_end_file, return_only_main) {
+TEST(cless_fend_file, return_only_main) {
     std::filesystem::path path = root_path / "test-data/return_only_main.c";
 
     File f(path);
