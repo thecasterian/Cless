@@ -8,14 +8,13 @@
 #include "cless/front-end/lexer/impl.h"
 
 namespace cless::fend::lexer {
-using core::types::MaybeEither;
 using core::types::Token;
 
 static std::string_view discardWhiteSpaces(std::string_view source) {
     return std::string_view{std::find_if_not(source.begin(), source.end(), isspace), source.end()};
 }
 
-MaybeEither<std::vector<Token>, LexerError> lex(std::string_view source) {
+std::expected<std::vector<core::types::Token>, LexerError> lex(std::string_view source) {
     std::vector<Token> tokens;
     // order matters
     std::vector<std::function<impl::LexerReturn(std::string_view)>> lexer_impls{
@@ -34,23 +33,25 @@ MaybeEither<std::vector<Token>, LexerError> lex(std::string_view source) {
         bool success = false;
 
         for (auto lexer_impl : lexer_impls) {
-            auto [result, remainder] = lexer_impl(source);
-            if (result.isJust()) {
-                success = true;
-                tokens.push_back(result.getJust());
-                source = discardWhiteSpaces(remainder);
-                break;
-            } else if (result.isError()) {
-                return MaybeEither<std::vector<Token>, LexerError>::error(result.getError());
+            auto lexer_return = lexer_impl(source);
+            if (lexer_return.has_value()) {
+                auto exp = lexer_return.value();
+                if (exp.has_value()) {
+                    auto [token, remainder] = exp.value();
+                    success = true;
+                    tokens.push_back(token);
+                    source = discardWhiteSpaces(remainder);
+                } else {
+                    return std::unexpected(exp.error());
+                }
             }
         }
 
         if (not success)
-            return MaybeEither<std::vector<Token>, LexerError>::error(
-                LexerError{std::format("stray \"{}\"", source[0]), std::string_view{source.begin(), 1}});
+            return std::unexpected(LexerError{std::format("stray \"{}\"", source[0]), std::string_view{source.begin(), 1}});
     }
 
-    return MaybeEither<std::vector<Token>, LexerError>::just(std::move(tokens));
+    return tokens;
 }
 
 }  // namespace cless::fend::lexer
