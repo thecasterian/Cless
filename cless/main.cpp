@@ -13,8 +13,8 @@ int main(int argc, char *argv[]) {
     cless::fend::file::File f(path);
 
     auto tokens = cless::fend::lexer::lex(f.getContents());
-    if (tokens.isError()) {
-        std::cerr << tokens.getError().msg << std::endl;
+    if (not tokens.has_value()) {
+        std::cerr << tokens.error().message << std::endl;
         return EXIT_FAILURE;
     }
 }
