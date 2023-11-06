@@ -4,14 +4,11 @@
 #include <string>
 #include <string_view>
 
-#include "cless/core/types/monadic.h"
-#include "cless/core/types/token.h"
-
 namespace cless::fend::lexer {
 
 struct LexerError {
-    std::string msg;
-    std::string_view str;
+    std::string message;
+    std::string_view source;
 };
 
 }

@@ -34,7 +34,7 @@ enum class KeywordType {
     Inline,
     Int,
     Long,
-    NullPtr,
+    Nullptr,
     Restrict,
     Return,
     Short,

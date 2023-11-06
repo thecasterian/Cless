@@ -150,7 +150,7 @@ struct TokenToStringVisitor {
                 return "int";
             case KeywordType::Long:
                 return "long";
-            case KeywordType::NullPtr:
+            case KeywordType::Nullptr:
                 return "nullptr";
             case KeywordType::Restrict:
                 return "restrict";
