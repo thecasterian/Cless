@@ -4,12 +4,12 @@
 #include <expected>
 #include <vector>
 
+#include "cless/core/types/compiler_message.h"
 #include "cless/core/types/token.h"
-#include "cless/front-end/lexer/data.h"
 
 namespace cless::fend::lexer {
 
-std::expected<std::vector<core::types::Token>, LexerError> lex(std::string_view source);
+std::expected<std::vector<core::types::Token>, core::types::Error> lex(std::string_view source);
 
 }
 

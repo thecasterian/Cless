@@ -7,7 +7,6 @@ set(TARGET_ALIAS cless::${LIBRARY_NAME}::${SUBLIBRARY_NAME})
 set(TEST ${TARGET}-test)
 
 add_library(${TARGET} SHARED
-    include/cless/front-end/lexer/data.h
     include/cless/front-end/lexer/impl.h
     src/impl.cpp
     include/cless/front-end/lexer/lexer.h

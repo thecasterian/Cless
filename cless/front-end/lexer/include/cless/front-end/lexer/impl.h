@@ -1,11 +1,11 @@
 #ifndef CLESS_FRONT_END_LEXER_IMPL_H
 #define CLESS_FRONT_END_LEXER_IMPL_H
 
-#include <optional>
 #include <expected>
+#include <optional>
 
+#include "cless/core/types/compiler_message.h"
 #include "cless/core/types/token.h"
-#include "cless/front-end/lexer/data.h"
 
 namespace cless::fend::lexer::impl {
 
@@ -14,7 +14,7 @@ struct LexerResult {
     std::string_view remainder;
 };
 
-using LexerReturn = std::optional<std::expected<LexerResult, LexerError>>;
+using LexerReturn = std::optional<std::expected<LexerResult, core::types::Error>>;
 
 LexerReturn keyword(std::string_view input);
 LexerReturn punctuation(std::string_view input);

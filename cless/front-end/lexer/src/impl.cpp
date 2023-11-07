@@ -6,6 +6,7 @@
 
 namespace cless::fend::lexer::impl {
 using core::types::CharacterConstant;
+using core::types::Error;
 using core::types::FloatingConstant;
 using core::types::Identifier;
 using core::types::IntegerConstant;
@@ -28,8 +29,8 @@ static const std::pair<KeywordType, std::string> keywords[] = {
     {KeywordType::Const, "const"},
     {KeywordType::Continue, "continue"},
     {KeywordType::Default, "default"},
+    {KeywordType::Double, "double"},  // double must come before do
     {KeywordType::Do, "do"},
-    {KeywordType::Double, "double"},
     {KeywordType::Else, "else"},
     {KeywordType::Enum, "enum"},
     {KeywordType::False, "false"},
@@ -47,8 +48,8 @@ static const std::pair<KeywordType, std::string> keywords[] = {
     {KeywordType::Short, "short"},
     {KeywordType::Signed, "signed"},
     {KeywordType::Sizeof, "sizeof"},
+    {KeywordType::StaticAssert, "static_assert"},  // static_assert must come before static
     {KeywordType::Static, "static"},
-    {KeywordType::StaticAssert, "static_assert"},
     {KeywordType::Struct, "struct"},
     {KeywordType::Switch, "switch"},
     {KeywordType::True, "true"},
@@ -198,7 +199,7 @@ LexerReturn integerConstant(std::string_view input) {
         auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
         if (not suffix.has_value())
             return std::unexpected(
-                LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src});
+                Error{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src});
         return LexerResult{IntegerConstant{value, suffix.value(), source}, input.substr(match.length())};
     }
 
@@ -209,11 +210,11 @@ LexerReturn integerConstant(std::string_view input) {
         auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
         for (auto it = source.begin(); it < suffix_src.begin(); it++)
             if (*it == '8' or *it == '9')
-                return std::unexpected(LexerError{
-                    std::format("invalid digit \"{}\" in octal constant", *it), std::string_view{it, it + 1}});
+                return std::unexpected(
+                    Error{std::format("invalid digit \"{}\" in octal constant", *it), std::string_view{it, it + 1}});
         if (not suffix.has_value())
             return std::unexpected(
-                LexerError{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src});
+                Error{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src});
         return LexerResult{IntegerConstant{value, suffix.value(), source}, input.substr(match.length())};
     }
 
@@ -230,25 +231,25 @@ LexerReturn floatingConstant(std::string_view input) {
         auto suffix = core::types::floatingSuffixFromStr(std::string(suffix_src));
         if (not suffix.has_value())
             return std::unexpected(
-                LexerError{std::format("invalid suffix \"{}\" on floating constant", suffix_src), suffix_src});
+                Error{std::format("invalid suffix \"{}\" on floating constant", suffix_src), suffix_src});
         return LexerResult{FloatingConstant{value, suffix.value(), source}, input.substr(match.length())};
     }
 
     return std::nullopt;
 }
 
-static std::optional<LexerError> validateEscapeSequence(const std::string &value) {
+static std::optional<Error> validateEscapeSequence(const std::string &value) {
     for (auto it = value.begin(); it != value.end(); ++it) {
         if (*it == '\\') {
             ++it;
             if (*it == 'u' or *it == 'U')
-                return LexerError{"universal character names are not supported", std::string_view{it - 1, it + 1}};
+                return Error{"universal character names are not supported", std::string_view{it - 1, it + 1}};
             if (not isSimpleEscapeSequence(*it) and not isOctalDigit(*it) and *it != 'x')
-                return LexerError{"unknown escape sequence", std::string_view{it - 1, it + 1}};
+                return Error{"unknown escape sequence", std::string_view{it - 1, it + 1}};
             if (*it == 'x') {
                 ++it;
                 if (not isxdigit(*it))
-                    return LexerError{"\\x used with no following hex digits", std::string_view{it - 2, it}};
+                    return Error{"\\x used with no following hex digits", std::string_view{it - 2, it}};
             }
         }
     }
@@ -262,7 +263,7 @@ LexerReturn characterConstant(std::string_view input) {
     if (std::regex_search(input.begin(), input.end(), match, character_constant_re)) {
         auto term_quote_pos = input.begin() + match.position() + match.length();
         if (term_quote_pos == input.end() or *term_quote_pos != '\'')
-            return std::unexpected(LexerError{
+            return std::unexpected(Error{
                 "missing terminating ' character", std::string_view{input.begin() + match.position(), term_quote_pos}});
 
         auto source = std::string_view{input.begin() + match.position(), term_quote_pos + 1};
@@ -270,8 +271,8 @@ LexerReturn characterConstant(std::string_view input) {
         auto prefix_src = std::string_view{input.begin() + match.position(), size_t(match.length(1))};
         auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_src));
         if (not prefix.has_value())
-            return std::unexpected(LexerError{
-                std::format("invalid encoding prefix \"{}\" on character constant", prefix_src), prefix_src});
+            return std::unexpected(
+                Error{std::format("invalid encoding prefix \"{}\" on character constant", prefix_src), prefix_src});
 
         auto valid = validateEscapeSequence(value);
         if (valid.has_value()) return std::unexpected(valid.value());
@@ -288,7 +289,7 @@ LexerReturn stringLiteral(std::string_view input) {
     if (std::regex_search(input.begin(), input.end(), match, string_literal_re)) {
         auto term_quote_pos = input.begin() + match.position() + match.length();
         if (term_quote_pos == input.end() or *term_quote_pos != '"')
-            return std::unexpected(LexerError{
+            return std::unexpected(Error{
                 "missing terminating \" character",
                 std::string_view{input.begin() + match.position(), term_quote_pos}});
 
@@ -298,7 +299,7 @@ LexerReturn stringLiteral(std::string_view input) {
         auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_src));
         if (not prefix.has_value())
             return std::unexpected(
-                LexerError{std::format("invalid encoding prefix \"{}\" on string literal", prefix_src), prefix_src});
+                Error{std::format("invalid encoding prefix \"{}\" on string literal", prefix_src), prefix_src});
 
         auto valid = validateEscapeSequence(value);
         if (valid.has_value()) return std::unexpected(valid.value());
