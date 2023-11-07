@@ -30,6 +30,7 @@ TEST(cless_fend_file, empty_main) {
     ASSERT_EQ(f.getPath(), path);
     ASSERT_EQ(f.getContents(), "int main(void) {}\n");
     ASSERT_EQ(f.getNumLines(), 1);
+    ASSERT_EQ(f.getLine(0), "int main(void) {}");
 }
 
 TEST(cless_fend_file, return_only_main) {
@@ -38,7 +39,7 @@ TEST(cless_fend_file, return_only_main) {
     File f(path);
     ASSERT_EQ(f.getPath(), path);
     ASSERT_EQ(f.getNumLines(), 3);
-    ASSERT_EQ(f.getLine(0), "int main(void) {\n");
-    ASSERT_EQ(f.getLine(1), "    return 0;\n");
-    ASSERT_EQ(f.getLine(2), "}\n");
+    ASSERT_EQ(f.getLine(0), "int main(void) {");
+    ASSERT_EQ(f.getLine(1), "    return 0;");
+    ASSERT_EQ(f.getLine(2), "}");
 }

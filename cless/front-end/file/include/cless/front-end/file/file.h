@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include "cless/core/types/compiler_message.h"
+
 namespace cless::fend::file {
 
 class File {
@@ -23,10 +25,16 @@ public:
     std::string::const_iterator begin() const;
     std::string::const_iterator end() const;
 
+    std::string compilerMessageString(const core::types::Note& note) const;
+    std::string compilerMessageString(const core::types::Error& error) const;
+    std::string compilerMessageString(const core::types::Warning& warning) const;
+
 private:
     std::filesystem::path path;
     std::string contents;
     std::vector<std::string_view> lines;
+
+    std::size_t getLineNumber(std::string_view source) const;
 };
 
 }  // namespace cless::fend::file

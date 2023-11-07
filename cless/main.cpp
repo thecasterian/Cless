@@ -14,7 +14,12 @@ int main(int argc, char *argv[]) {
 
     auto tokens = cless::fend::lexer::lex(f.getContents());
     if (not tokens.has_value()) {
-        std::cerr << tokens.error().message << std::endl;
+        auto error = tokens.error();
+        std::cerr << f.compilerMessageString(error) << std::endl;
         return EXIT_FAILURE;
+    } else {
+        for (const auto& token : tokens.value()) {
+            std::cout << token << std::endl;
+        }
     }
 }

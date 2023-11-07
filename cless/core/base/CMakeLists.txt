@@ -8,6 +8,8 @@ set(TARGET_ALIAS cless::${LIBRARY_NAME}::${SUBLIBRARY_NAME})
 add_library(${TARGET} SHARED
     include/cless/core/base/base.h
     src/base.cpp
+    include/cless/core/base/print.h
+    src/print.cpp
 )
 
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)
