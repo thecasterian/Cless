@@ -61,8 +61,16 @@ TEST(cless_fend_lexer_intconst, suffix_ull) {
 }
 
 TEST(cless_fend_lexer_intconst, suffix_wrong) {
-    std::string source = "12345_wrong_suffix";
+    std::string source = "0X12345_wrong_suffix";
 
     auto lexer_return = cless::fend::lexer::impl::integerConstant(source);
     ASSERT_FALSE(lexer_return.has_value() and lexer_return.value().has_value());
+}
+
+TEST(cless_fend_lexer_intconst, following_token) {
+    std::string source = "0xFFull 'a' int";
+
+    auto lexer_return = cless::fend::lexer::impl::integerConstant(source);
+    auto remainder = lexer_return.value().value().remainder;
+    ASSERT_EQ(remainder, " 'a' int");
 }

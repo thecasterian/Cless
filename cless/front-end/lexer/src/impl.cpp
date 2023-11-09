@@ -1,5 +1,6 @@
 #include "cless/front-end/lexer/impl.h"
 
+#include <cctype>
 #include <format>
 #include <iostream>
 #include <regex>
@@ -117,12 +118,17 @@ static const std::pair<PunctuationType, std::string> punctuations[] = {
 };
 
 static const std::regex identifier_re("^[a-zA-Z_$][a-zA-Z0-9_$]*");
-static const std::regex integer_constant_dec_hex_re("^[1-9][0-9]*(\\w*)|^0[xX][0-9a-fA-F]+(\\w*)");
+static const std::regex integer_constant_dec_re("^[1-9][0-9]*(\\w*)");
+static const std::regex integer_constant_hex_re("^0[xX][0-9a-fA-F]+(\\w*)");
 static const std::regex integer_constant_oct_re("^0[0-9]*(\\w*)");
-static const std::regex floating_constant_re(
-    "^(?:[0-9]*\\.[0-9]+|[0-9]+\\.)(?:[eE][+-]?[0-9]+)?(\\w*)|"
-    "^[0-9]+[eE][+-]?[0-9]+(\\w*)|"
+static const std::regex floating_constant_dec_dot_re("^(?:[0-9]*\\.[0-9]+|[0-9]+\\.)(?:[eE][+-]?[0-9]+)?(\\w*)");
+static const std::regex floating_constant_dec_no_dot_re("^[0-9]+[eE][+-]?[0-9]+(\\w*)");
+static const std::regex floating_constant_hex_re(
     "^0[xX](?:[0-9a-fA-F]*\\.[0-9a-fA-F]+|[0-9a-fA-F]+\\.?)[pP][+-]?[0-9]+(\\w*)");
+static const std::regex floating_constant_no_exponent_digits_re(
+    "^0[xX](?:[0-9a-fA-F]*\\.[0-9a-fA-F]+|[0-9a-fA-F]+\\.?)p");
+static const std::regex floating_constant_no_exponent_re("^0[xX](?:[0-9a-fA-F]*\\.[0-9a-fA-F]+|[0-9a-fA-F]+\\.)");
+static const std::regex floating_constant_no_digits_re("^0[xX]\\.");
 static const std::regex character_constant_re("^(\\w*)'((?:[^'\\\\\\n]|\\\\.)*)\\\\?");
 static const std::regex string_literal_re("^(\\w*)\"((?:[^\"\\\\\\n]|\\\\.)*)\\\\?");
 
@@ -181,7 +187,7 @@ LexerReturn identifier(std::string_view input) {
     std::cmatch match;
 
     if (std::regex_search(input.begin(), input.end(), match, identifier_re)) {
-        auto source = std::string_view(input.begin() + match.position(), size_t(match.length()));
+        auto source = std::string_view(input.begin(), size_t(match.length()));
         std::string name(source.begin(), source.end());
         return LexerResult{Identifier{name, source}, input.substr(match.length())};
     }
@@ -192,20 +198,24 @@ LexerReturn identifier(std::string_view input) {
 LexerReturn integerConstant(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(input.begin(), input.end(), match, integer_constant_dec_hex_re)) {
-        auto source = std::string_view{input.begin() + match.position(), size_t(match.length())};
-        auto value = std::string(input.begin() + match.position(), input.begin() + match.position(1));
-        auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
-        auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
-        if (not suffix.has_value())
-            return std::unexpected(
-                Error{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src});
-        return LexerResult{IntegerConstant{value, suffix.value(), source}, input.substr(match.length())};
-    }
+    for (auto &re : {integer_constant_dec_re, integer_constant_hex_re})
+        if (std::regex_search(input.begin(), input.end(), match, re)) {
+            auto source = std::string_view(input.begin(), size_t(match.length()));
+            auto value = std::string(
+                input.begin(),
+                match.length(1) > 0 ? input.begin() + match.position(1) : input.begin() + match.length());
+            auto suffix_src = std::string_view(input.begin() + match.position(1), size_t(match.length(1)));
+            auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
+            if (not suffix.has_value())
+                return std::unexpected(
+                    Error{std::format("invalid suffix \"{}\" on integer constant", suffix_src), suffix_src});
+            return LexerResult{IntegerConstant{value, suffix.value(), source}, input.substr(match.length())};
+        }
 
     if (std::regex_search(input.begin(), input.end(), match, integer_constant_oct_re)) {
-        auto source = std::string_view{input.begin() + match.position(), size_t(match.length())};
-        auto value = std::string(input.begin() + match.position(), input.begin() + match.position(1));
+        auto source = std::string_view{input.begin(), size_t(match.length())};
+        auto value = std::string(
+            input.begin(), match.length(1) > 0 ? input.begin() + match.position(1) : input.begin() + match.length());
         auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
         auto suffix = core::types::integerSuffixFromStr(std::string(suffix_src));
         for (auto it = source.begin(); it < suffix_src.begin(); it++)
@@ -224,15 +234,32 @@ LexerReturn integerConstant(std::string_view input) {
 LexerReturn floatingConstant(std::string_view input) {
     std::cmatch match;
 
-    if (std::regex_search(input.begin(), input.end(), match, floating_constant_re)) {
-        auto source = std::string_view{input.begin() + match.position(), size_t(match.length())};
-        auto value = std::string(input.begin() + match.position(), input.begin() + match.position(1));
-        auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
-        auto suffix = core::types::floatingSuffixFromStr(std::string(suffix_src));
-        if (not suffix.has_value())
+    for (auto &re : {floating_constant_dec_dot_re, floating_constant_dec_no_dot_re, floating_constant_hex_re})
+        if (std::regex_search(input.begin(), input.end(), match, re)) {
+            auto source = std::string_view{input.begin(), size_t(match.length())};
+            auto value = std::string(
+                input.begin(),
+                match.length(1) > 0 ? input.begin() + match.position(1) : input.begin() + match.length());
+            auto suffix_src = std::string_view{input.begin() + match.position(1), size_t(match.length(1))};
+            auto suffix = core::types::floatingSuffixFromStr(std::string(suffix_src));
+            if (not suffix.has_value())
+                return std::unexpected(
+                    Error{std::format("invalid suffix \"{}\" on floating constant", suffix_src), suffix_src});
+            return LexerResult{FloatingConstant{value, suffix.value(), source}, input.substr(match.length())};
+        }
+
+    if (std::regex_search(input.begin(), input.end(), match, floating_constant_no_exponent_digits_re))
+        return std::unexpected(
+            Error{"exponent has no digits", std::string_view{input.begin(), size_t(match.length())}});
+    if (std::regex_search(input.begin(), input.end(), match, floating_constant_no_exponent_re))
+        return std::unexpected(Error{
+            "hexadecimal floating constants require an exponent",
+            std::string_view{input.begin(), size_t(match.length())}});
+    if (std::regex_search(input.begin(), input.end(), match, floating_constant_no_digits_re)) {
+        auto end = input.begin() + match.length();
+        if (end == input.end() or not isxdigit(*end))
             return std::unexpected(
-                Error{std::format("invalid suffix \"{}\" on floating constant", suffix_src), suffix_src});
-        return LexerResult{FloatingConstant{value, suffix.value(), source}, input.substr(match.length())};
+                Error{"no digits in hexadecimal floating constant", std::string_view{input.begin(), end}});
     }
 
     return std::nullopt;
@@ -261,14 +288,16 @@ LexerReturn characterConstant(std::string_view input) {
     std::cmatch match;
 
     if (std::regex_search(input.begin(), input.end(), match, character_constant_re)) {
-        auto term_quote_pos = input.begin() + match.position() + match.length();
+        auto term_quote_pos = input.begin() + match.length();
         if (term_quote_pos == input.end() or *term_quote_pos != '\'')
-            return std::unexpected(Error{
-                "missing terminating ' character", std::string_view{input.begin() + match.position(), term_quote_pos}});
+            return std::unexpected(
+                Error{"missing terminating ' character", std::string_view(input.begin(), term_quote_pos)});
+        if (match.length(2) == 0)
+            return std::unexpected(Error{"empty character constant", std::string_view(input.begin(), match.length())});
 
-        auto source = std::string_view{input.begin() + match.position(), term_quote_pos + 1};
-        auto value = std::string(input.begin() + match.position(2), size_t(match.length(2)));
-        auto prefix_src = std::string_view{input.begin() + match.position(), size_t(match.length(1))};
+        auto source = std::string_view(input.begin(), term_quote_pos + 1);
+        auto value = std::string(input.begin() + match.length(1) + 1, term_quote_pos);
+        auto prefix_src = std::string_view{input.begin(), size_t(match.length(1))};
         auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_src));
         if (not prefix.has_value())
             return std::unexpected(
@@ -287,15 +316,14 @@ LexerReturn stringLiteral(std::string_view input) {
     std::cmatch match;
 
     if (std::regex_search(input.begin(), input.end(), match, string_literal_re)) {
-        auto term_quote_pos = input.begin() + match.position() + match.length();
+        auto term_quote_pos = input.begin() + match.length();
         if (term_quote_pos == input.end() or *term_quote_pos != '"')
-            return std::unexpected(Error{
-                "missing terminating \" character",
-                std::string_view{input.begin() + match.position(), term_quote_pos}});
+            return std::unexpected(
+                Error{"missing terminating \" character", std::string_view{input.begin(), term_quote_pos}});
 
-        auto source = std::string_view{input.begin() + match.position(), term_quote_pos + 1};
-        auto value = std::string(input.begin() + match.position(2), size_t(match.length(2)));
-        auto prefix_src = std::string_view{input.begin() + match.position(), size_t(match.length(1))};
+        auto source = std::string_view{input.begin(), term_quote_pos + 1};
+        auto value = std::string(input.begin() + match.length(1) + 1, term_quote_pos);
+        auto prefix_src = std::string_view{input.begin(), size_t(match.length(1))};
         auto prefix = core::types::encodingPrefixFromStr(std::string(prefix_src));
         if (not prefix.has_value())
             return std::unexpected(

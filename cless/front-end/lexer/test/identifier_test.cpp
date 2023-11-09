@@ -42,3 +42,11 @@ TEST(cless_fend_lexer_identifier, start_with_digit) {
     auto lexer_return = cless::fend::lexer::impl::identifier(source);
     ASSERT_FALSE(lexer_return.has_value() and lexer_return.value().has_value());
 }
+
+TEST(cless_fend_lexer_identifier, following_token) {
+    std::string source = "abcde 123 \"Hi\"";
+
+    auto lexer_return = cless::fend::lexer::impl::identifier(source);
+    auto remainder = lexer_return.value().value().remainder;
+    ASSERT_EQ(remainder, " 123 \"Hi\"");
+}

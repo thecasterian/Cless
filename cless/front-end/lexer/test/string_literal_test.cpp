@@ -131,3 +131,11 @@ TEST(cless_fend_lexer_strlit, prefix_wrong) {
     auto lexer_return = cless::fend::lexer::impl::stringLiteral(source);
     ASSERT_FALSE(lexer_return.has_value() and lexer_return.value().has_value());
 }
+
+TEST(cless_fend_lexer_strlit, following_token) {
+    std::string source = "u8\"str\\a\" 123 5.7";
+
+    auto lexer_return = cless::fend::lexer::impl::stringLiteral(source);
+    auto remainder = lexer_return.value().value().remainder;
+    ASSERT_EQ(remainder, " 123 5.7");
+}

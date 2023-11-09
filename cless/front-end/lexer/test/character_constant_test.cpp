@@ -131,3 +131,11 @@ TEST(cless_fend_lexer_charconst, prefix_wrong) {
     auto lexer_return = cless::fend::lexer::impl::characterConstant(source);
     ASSERT_FALSE(lexer_return.has_value() and lexer_return.value().has_value());
 }
+
+TEST(cless_fend_lexer_charconst, following_token) {
+    std::string source = "u8'a\\bc' 123 int";
+
+    auto lexer_return = cless::fend::lexer::impl::characterConstant(source);
+    auto remainder = lexer_return.value().value().remainder;
+    ASSERT_EQ(remainder, " 123 int");
+}

@@ -151,3 +151,18 @@ TEST(cless_fend_lexer_floatconst, suffix_l) {
     ASSERT_EQ(float_const.value, "13.45e+7");
     ASSERT_EQ(float_const.suffix, cless::core::types::FloatingSuffix::LongDouble);
 }
+
+TEST(cless_fend_lexer_floatconst, suffix_wrong) {
+    std::string source = "0x125.679e+7KLM";
+
+    auto lexer_return = cless::fend::lexer::impl::floatingConstant(source);
+    ASSERT_FALSE(lexer_return.has_value() and lexer_return.value().has_value());
+}
+
+TEST(cless_fend_lexer_floatconst, following_token) {
+    std::string source = "1.5e+3 abc 0xFF";
+
+    auto lexer_return = cless::fend::lexer::impl::floatingConstant(source);
+    auto remainder = lexer_return.value().value().remainder;
+    ASSERT_EQ(remainder, " abc 0xFF");
+}
