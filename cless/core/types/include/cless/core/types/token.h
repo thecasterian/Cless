@@ -1,0 +1,177 @@
+#ifndef CLESS_CORE_TYPES_TOKEN_H
+#define CLESS_CORE_TYPES_TOKEN_H
+
+#include <iostream>
+#include <optional>
+#include <string>
+#include <variant>
+
+namespace cless::core::types {
+
+// C89 keywords
+enum class Keyword {
+    Continue,
+    Register,
+    Unsigned,
+    Volatile,
+    Default,
+    Typedef,
+    Double,
+    Extern,
+    Return,
+    Signed,
+    Sizeof,
+    Static,
+    Struct,
+    Switch,
+    Break,
+    Const,
+    Float,
+    Short,
+    While,
+    Union,
+    Auto,
+    Case,
+    Char,
+    Else,
+    Enum,
+    Goto,
+    Long,
+    Void,
+    For,
+    Int,
+    Do,
+    If,
+};
+
+std::string toString(Keyword keyword);
+std::optional<Keyword> keywordFromStr(const std::string& str);
+
+enum class Punctuation {
+    DoubleLessThanEqual,     // <<=
+    DoubleGreaterThanEqual,  // >>=
+    Ellipsis,                // ...
+    Arrow,                   // ->
+    DoublePlus,              // ++
+    DoubleMinus,             // --
+    DoubleLessThan,          // <<
+    DoubleGreaterThan,       // >>
+    LessThanEqual,           // <=
+    GreaterThanEqual,        // >=
+    DoubleEqual,             // ==
+    ExclamationEqual,        // !=
+    DoubleAmpersand,         // &&
+    DoubleVerticalBar,       // ||
+    AsteriskEqual,           // *=
+    SlashEqual,              // /=
+    PercentEqual,            // %=
+    PlusEqual,               // +=
+    MinusEqual,              // -=
+    AmpersandEqual,          // &=
+    CaretEqual,              // ^=
+    VerticalBarEqual,        // |=
+    DoubleHash,              // ##
+    OpenBracket,             // [
+    CloseBracket,            // ]
+    OpenParenthesis,         // (
+    CloseParenthesis,        // )
+    OpenBrace,               // {
+    CloseBrace,              // }
+    Dot,                     // .
+    Ampersand,               // &
+    Asterisk,                // *
+    Plus,                    // +
+    Minus,                   // -
+    Tilde,                   // ~
+    Exclamation,             // !
+    Slash,                   // /
+    Percent,                 // %
+    LessThan,                // <
+    GreaterThan,             // >
+    Caret,                   // ^
+    VerticalBar,             // |
+    Question,                // ?
+    Colon,                   // :
+    Semicolon,               // ;
+    Equal,                   // =
+    Comma,                   // ,
+    Hash,                    // #
+};
+
+std::string toString(Punctuation punct);
+std::optional<Punctuation> punctuationFromStr(const std::string& str);
+
+struct Identifier {
+    std::string name;
+};
+
+enum class IntegerSuffix {
+    None,
+    Unsigned,
+    Long,
+    UnsignedLong,
+    LongLong,
+    UnsignedLongLong,
+};
+
+std::string toString(IntegerSuffix int_suffix);
+std::optional<IntegerSuffix> integerSuffixFromStr(const std::string& str);
+
+struct IntegerConstant {
+    std::string value;
+    IntegerSuffix suffix;
+};
+
+enum class FloatingSuffix {
+    None,
+    Float,
+    LongDouble,
+};
+
+std::string toString(FloatingSuffix float_suffix);
+std::optional<FloatingSuffix> floatingSuffixFromStr(const std::string& str);
+
+struct FloatingConstant {
+    std::string value;
+    FloatingSuffix suffix;
+};
+
+struct CharacterConstant {
+    std::string value;
+};
+
+struct StringLiteral {
+    std::string value;
+};
+
+struct Token : public std::variant<
+                   Keyword,
+                   Punctuation,
+                   Identifier,
+                   IntegerConstant,
+                   FloatingConstant,
+                   CharacterConstant,
+                   StringLiteral> {
+    using variant::variant;
+
+    std::string file;
+    std::size_t line_start, line_end;
+    std::size_t col_start, col_end;
+
+    bool isKeyword() const;
+    bool isKeyword(Keyword keyword) const;
+    bool isPunctuation() const;
+    bool isPunctuation(Punctuation punct) const;
+    bool isIdentifier() const;
+    bool isIntegerConstant() const;
+    bool isFloatingConstant() const;
+    bool isCharacterConstant() const;
+    bool isStringLiteral() const;
+};
+
+std::string toString(const Token& token);
+std::ostream& operator<<(std::ostream& os, const Token& token);
+
+}  // namespace cless::core::types
+
+#endif
