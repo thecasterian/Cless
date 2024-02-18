@@ -261,4 +261,70 @@ std::ostream &operator<<(std::ostream &os, const Token &token) {
     return os;
 }
 
+struct PreprocessingTokenToStringVisitor {
+    std::string operator()(const HeaderName &header_name) const {
+        return std::format(
+            "{}{}{}", header_name.is_system ? "<" : "\"", header_name.name, header_name.is_system ? ">" : "\"");
+    }
+
+    std::string operator()(Punctuation punct) const { return toString(punct); }
+
+    std::string operator()(const Identifier &identifier) const { return identifier.name; }
+
+    std::string operator()(const IntegerConstant &int_constant) const {
+        return std::format("{}{}", int_constant.value, toString(int_constant.suffix));
+    }
+
+    std::string operator()(const FloatingConstant &float_const) const {
+        return std::format("{}{}", float_const.value, toString(float_const.suffix));
+    }
+
+    std::string operator()(const CharacterConstant &char_const) const { return std::format("'{}'", char_const.value); }
+
+    std::string operator()(const StringLiteral &string_literal) const {
+        return std::format("\"{}\"", string_literal.value);
+    }
+};
+
+bool PreprocessingToken::isHeaderName() const {
+    return std::holds_alternative<HeaderName>(*this);
+}
+
+bool PreprocessingToken::isIdentifier() const {
+    return std::holds_alternative<Identifier>(*this);
+}
+
+bool PreprocessingToken::isPunctuation() const {
+    return std::holds_alternative<Punctuation>(*this);
+}
+
+bool PreprocessingToken::isPunctuation(Punctuation punct) const {
+    return std::holds_alternative<Punctuation>(*this) and std::get<Punctuation>(*this) == punct;
+}
+
+bool PreprocessingToken::isIntegerConstant() const {
+    return std::holds_alternative<IntegerConstant>(*this);
+}
+
+bool PreprocessingToken::isFloatingConstant() const {
+    return std::holds_alternative<FloatingConstant>(*this);
+}
+
+bool PreprocessingToken::isCharacterConstant() const {
+    return std::holds_alternative<CharacterConstant>(*this);
+}
+
+bool PreprocessingToken::isStringLiteral() const {
+    return std::holds_alternative<StringLiteral>(*this);
+}
+
+std::string toString(const PreprocessingToken &pp_token) {
+    return std::visit(PreprocessingTokenToStringVisitor{}, pp_token);
+}
+
+std::ostream &operator<<(std::ostream &os, const PreprocessingToken &pp_token) {
+    os << toString(pp_token);
+    return os;
+}
+
 }  // namespace cless::core::types

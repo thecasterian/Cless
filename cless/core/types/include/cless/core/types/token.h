@@ -172,6 +172,38 @@ struct Token : public std::variant<
 std::string toString(const Token& token);
 std::ostream& operator<<(std::ostream& os, const Token& token);
 
+struct HeaderName {
+    std::string name;
+    bool is_system;  // <...> vs "..."
+};
+
+struct PreprocessingToken : public std::variant<
+                                HeaderName,
+                                Identifier,
+                                Punctuation,
+                                IntegerConstant,
+                                FloatingConstant,
+                                CharacterConstant,
+                                StringLiteral> {
+    using variant::variant;
+
+    std::string file;
+    std::size_t line_start, line_end;
+    std::size_t col_start, col_end;
+
+    bool isHeaderName() const;
+    bool isIdentifier() const;
+    bool isPunctuation() const;
+    bool isPunctuation(Punctuation type) const;
+    bool isIntegerConstant() const;
+    bool isFloatingConstant() const;
+    bool isCharacterConstant() const;
+    bool isStringLiteral() const;
+};
+
+std::string toString(const PreprocessingToken& pp_token);
+std::ostream& operator<<(std::ostream& os, const PreprocessingToken& pp_token);
+
 }  // namespace cless::core::types
 
 #endif
