@@ -170,6 +170,30 @@ std::optional<IntegerSuffix> integerSuffixFromStr(const std::string &str) {
         return std::nullopt;
 }
 
+std::string toString(IntegerBase int_base) {
+    switch (int_base) {
+        case IntegerBase::Decimal:
+            return "";
+        case IntegerBase::Octal:
+            return "0";
+        case IntegerBase::Hexadecimal:
+            return "0x";
+    }
+
+    throw Exception("Unknown integer base");
+}
+
+std::optional<IntegerBase> integerBaseFromStr(const std::string &str) {
+    if (str == "")
+        return IntegerBase::Decimal;
+    else if (str == "0")
+        return IntegerBase::Octal;
+    else if (str == "0x" or str == "0X")
+        return IntegerBase::Hexadecimal;
+    else
+        return std::nullopt;
+}
+
 std::string toString(FloatingSuffix float_suffix) {
     switch (float_suffix) {
         case FloatingSuffix::None:
@@ -195,24 +219,28 @@ std::optional<FloatingSuffix> floatingSuffixFromStr(const std::string &str) {
 }
 
 struct TokenToStringVisitor {
-    std::string operator()(Keyword keyword) const { return toString(keyword); }
+    std::string operator()(Keyword keyword) const { return std::format("Keyword({})", toString(keyword)); }
 
     std::string operator()(Punctuation punct) const { return toString(punct); }
 
-    std::string operator()(const Identifier &identifier) const { return identifier.name; }
+    std::string operator()(const Identifier &identifier) const {
+        return std::format("Identifier({})", identifier.name);
+    }
 
     std::string operator()(const IntegerConstant &int_constant) const {
-        return std::format("{}{}", int_constant.value, toString(int_constant.suffix));
+        return std::format("Integer({}{})", int_constant.value, toString(int_constant.suffix));
     }
 
     std::string operator()(const FloatingConstant &float_const) const {
-        return std::format("{}{}", float_const.value, toString(float_const.suffix));
+        return std::format("Floating({}{})", float_const.value, toString(float_const.suffix));
     }
 
-    std::string operator()(const CharacterConstant &char_const) const { return std::format("'{}'", char_const.value); }
+    std::string operator()(const CharacterConstant &char_const) const {
+        return std::format("Character('{}')", char_const.value);
+    }
 
     std::string operator()(const StringLiteral &string_literal) const {
-        return std::format("\"{}\"", string_literal.value);
+        return std::format("String(\"{}\")", string_literal.value);
     }
 };
 
@@ -257,7 +285,7 @@ std::string toString(const Token &token) {
 }
 
 std::ostream &operator<<(std::ostream &os, const Token &token) {
-    os << toString(token);
+    os << toString(token) << " at " << token.file << ":" << token.line_start << ":" << token.col_start;
     return os;
 }
 
@@ -316,6 +344,63 @@ bool PreprocessingToken::isCharacterConstant() const {
 
 bool PreprocessingToken::isStringLiteral() const {
     return std::holds_alternative<StringLiteral>(*this);
+}
+
+Token toToken(const PreprocessingToken &pp_token) {
+    if (pp_token.isIdentifier()) {
+        auto ident = std::get<Identifier>(pp_token);
+        if (auto keyword = keywordFromStr(ident.name); keyword.has_value())
+            return Token(
+                keyword.value(),
+                pp_token.file,
+                pp_token.line_start,
+                pp_token.col_start,
+                pp_token.line_end,
+                pp_token.col_end);
+        return Token(
+            ident, pp_token.file, pp_token.line_start, pp_token.col_start, pp_token.line_end, pp_token.col_end);
+    } else if (pp_token.isPunctuation()) {
+        return Token(
+            std::get<Punctuation>(pp_token),
+            pp_token.file,
+            pp_token.line_start,
+            pp_token.col_start,
+            pp_token.line_end,
+            pp_token.col_end);
+    } else if (pp_token.isIntegerConstant()) {
+        return Token(
+            std::get<IntegerConstant>(pp_token),
+            pp_token.file,
+            pp_token.line_start,
+            pp_token.col_start,
+            pp_token.line_end,
+            pp_token.col_end);
+    } else if (pp_token.isFloatingConstant()) {
+        return Token(
+            std::get<FloatingConstant>(pp_token),
+            pp_token.file,
+            pp_token.line_start,
+            pp_token.col_start,
+            pp_token.line_end,
+            pp_token.col_end);
+    } else if (pp_token.isCharacterConstant()) {
+        return Token(
+            std::get<CharacterConstant>(pp_token),
+            pp_token.file,
+            pp_token.line_start,
+            pp_token.col_start,
+            pp_token.line_end,
+            pp_token.col_end);
+    } else if (pp_token.isStringLiteral()) {
+        return Token(
+            std::get<StringLiteral>(pp_token),
+            pp_token.file,
+            pp_token.line_start,
+            pp_token.col_start,
+            pp_token.line_end,
+            pp_token.col_end);
+    }
+    throw Exception("Cannot convert PreprocessingToken to Token");
 }
 
 std::string toString(const PreprocessingToken &pp_token) {

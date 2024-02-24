@@ -117,7 +117,17 @@ enum class IntegerSuffix {
 std::string toString(IntegerSuffix int_suffix);
 std::optional<IntegerSuffix> integerSuffixFromStr(const std::string& str);
 
+enum class IntegerBase {
+    Decimal,
+    Octal,
+    Hexadecimal,
+};
+
+std::string toString(IntegerBase int_base);
+std::optional<IntegerBase> integerBaseFromStr(const std::string& str);
+
 struct IntegerConstant {
+    IntegerBase base;
     std::string value;
     IntegerSuffix suffix;
 };
@@ -152,11 +162,24 @@ struct Token : public std::variant<
                    FloatingConstant,
                    CharacterConstant,
                    StringLiteral> {
-    using variant::variant;
-
     std::string file;
     std::size_t line_start, line_end;
     std::size_t col_start, col_end;
+
+    template <typename T>
+    Token(
+        T&& value,
+        std::string file,
+        std::size_t line_start,
+        std::size_t line_end,
+        std::size_t col_start,
+        std::size_t col_end)
+        : variant(std::forward<T>(value)),
+          file(std::move(file)),
+          line_start(line_start),
+          line_end(line_end),
+          col_start(col_start),
+          col_end(col_end) {}
 
     bool isKeyword() const;
     bool isKeyword(Keyword keyword) const;
@@ -185,11 +208,24 @@ struct PreprocessingToken : public std::variant<
                                 FloatingConstant,
                                 CharacterConstant,
                                 StringLiteral> {
-    using variant::variant;
-
     std::string file;
     std::size_t line_start, line_end;
     std::size_t col_start, col_end;
+
+    template <typename T>
+    PreprocessingToken(
+        T&& value,
+        std::string file,
+        std::size_t line_start,
+        std::size_t line_end,
+        std::size_t col_start,
+        std::size_t col_end)
+        : variant(std::forward<T>(value)),
+          file(std::move(file)),
+          line_start(line_start),
+          line_end(line_end),
+          col_start(col_start),
+          col_end(col_end) {}
 
     bool isHeaderName() const;
     bool isIdentifier() const;
@@ -200,6 +236,8 @@ struct PreprocessingToken : public std::variant<
     bool isCharacterConstant() const;
     bool isStringLiteral() const;
 };
+
+Token toToken(const PreprocessingToken& pp_token);
 
 std::string toString(const PreprocessingToken& pp_token);
 std::ostream& operator<<(std::ostream& os, const PreprocessingToken& pp_token);
