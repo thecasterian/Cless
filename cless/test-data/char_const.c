@@ -4,4 +4,6 @@ int main() {
     char c3 = '\0';
     char c4 = '\0001';
     char c5 = '\x12';
+    char c6 = '\777';
+    char c7 = '\xFFF';
 }

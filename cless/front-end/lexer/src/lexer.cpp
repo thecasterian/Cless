@@ -6,6 +6,7 @@
 #include "cless/front-end/lexer/utils.h"
 
 namespace cless::fend::lexer {
+using core::types::Message;
 using core::types::PreprocessingToken;
 using core::types::Token;
 
@@ -22,10 +23,11 @@ Lexer::Lexer(std::string path) : path_(std::move(path)) {
     col = 1;
 }
 
-std::optional<Token> Lexer::next() {
-    if (auto pp_token = nextPreprocessingToken(); pp_token.has_value())
-        return core::types::toToken(pp_token.value());
-    return std::nullopt;
+Lexer::Return<core::types::Token> Lexer::next() {
+    auto pp_token = nextPreprocessingToken();
+    if (pp_token.ret.has_value())
+        return {core::types::toToken(pp_token.ret.value()), pp_token.msg};
+    return {std::nullopt, pp_token.msg};
 }
 
 const std::string& Lexer::path() const {
@@ -91,49 +93,82 @@ void Lexer::skipWhitespacesAndComments() {
     }
 }
 
-std::optional<PreprocessingToken> Lexer::nextPreprocessingToken() {
+Lexer::Return<PreprocessingToken> Lexer::nextPreprocessingToken() {
     skipWhitespacesAndComments();
 
     std::size_t start_line = line, start_col = col;
-    if (auto ident = getIdentifier(); ident.has_value())
-        return PreprocessingToken(ident.value(), path_, start_line, start_col, line, col);
-    if (auto punct = getPunctuation(); punct.has_value())
-        return PreprocessingToken(punct.value(), path_, start_line, start_col, line, col);
-    if (auto float_const = getFloatingConstant(); float_const.has_value())
-        return PreprocessingToken(float_const.value(), path_, start_line, start_col, line, col);
-    if (auto int_const = getIntegerConstant(); int_const.has_value())
-        return PreprocessingToken(int_const.value(), path_, start_line, start_col, line, col);
-    if (auto char_const = getCharacterConstant(); char_const.has_value())
-        return PreprocessingToken(char_const.value(), path_, start_line, start_col, line, col);
-    if (auto str_lit = getStringLiteral(); str_lit.has_value())
-        return PreprocessingToken(str_lit.value(), path_, start_line, start_col, line, col);
-    return std::nullopt;
+    if (auto ident = getIdentifier(); ident.ret.has_value() or ident.msg.size() > 0) {
+        if (ident.ret.has_value())
+            return {
+                PreprocessingToken(ident.ret.value(), path_, start_line, start_col, line, col), std::move(ident.msg)};
+        return {std::nullopt, std::move(ident.msg)};
+    }
+    if (auto punct = getPunctuation(); punct.ret.has_value() or punct.msg.size() > 0) {
+        if (punct.ret.has_value())
+            return {
+                PreprocessingToken(punct.ret.value(), path_, start_line, start_col, line, col), std::move(punct.msg)};
+        return {std::nullopt, std::move(punct.msg)};
+    }
+    if (auto float_const = getFloatingConstant(); float_const.ret.has_value() or float_const.msg.size() > 0) {
+        if (float_const.ret.has_value())
+            return {
+                PreprocessingToken(float_const.ret.value(), path_, start_line, start_col, line, col),
+                std::move(float_const.msg)};
+        return {std::nullopt, std::move(float_const.msg)};
+    }
+    if (auto int_const = getIntegerConstant(); int_const.ret.has_value() or int_const.msg.size() > 0) {
+        if (int_const.ret.has_value())
+            return {
+                PreprocessingToken(int_const.ret.value(), path_, start_line, start_col, line, col),
+                std::move(int_const.msg)};
+        return {std::nullopt, std::move(int_const.msg)};
+    }
+    if (auto char_const = getCharacterConstant(); char_const.ret.has_value() or char_const.msg.size() > 0) {
+        if (char_const.ret.has_value())
+            return {
+                PreprocessingToken(char_const.ret.value(), path_, start_line, start_col, line, col),
+                std::move(char_const.msg)};
+        return {std::nullopt, std::move(char_const.msg)};
+    }
+    if (auto str_lit = getStringLiteral(); str_lit.ret.has_value() or str_lit.msg.size() > 0) {
+        if (str_lit.ret.has_value())
+            return {
+                PreprocessingToken(str_lit.ret.value(), path_, start_line, start_col, line, col),
+                std::move(str_lit.msg)};
+        return {std::nullopt, std::move(str_lit.msg)};
+    }
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::HeaderName> Lexer::getHeaderName() {
+Lexer::Return<core::types::HeaderName> Lexer::getHeaderName() {
+    auto start = tell();
     if (*ptr == '<') {
         std::string name;
         adv();
         while (*ptr != '>') {
+            if (*ptr == '\n' or *ptr == '\0')
+                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing angle bracket")}};
             name.push_back(*ptr);
             adv();
         }
         adv();
-        return core::types::HeaderName{name, true};
+        return {core::types::HeaderName{name, true}, {}};
     } else if (*ptr == '"') {
         std::string name;
         adv();
         while (*ptr != '"') {
+            if (*ptr == '\n' or *ptr == '\0')
+                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
             name.push_back(*ptr);
             adv();
         }
         adv();
-        return core::types::HeaderName{name, false};
+        return {core::types::HeaderName{name, false}, {}};
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::Identifier> Lexer::getIdentifier() {
+Lexer::Return<core::types::Identifier> Lexer::getIdentifier() {
     if (utils::isIdentifierStartChar(*ptr)) {
         std::string name;
         name.push_back(*ptr);
@@ -142,12 +177,12 @@ std::optional<core::types::Identifier> Lexer::getIdentifier() {
             name.push_back(*ptr);
             adv();
         }
-        return core::types::Identifier{name};
+        return {core::types::Identifier{name}, {}};
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::IntegerConstant> Lexer::getIntegerConstant() {
+Lexer::Return<core::types::IntegerConstant> Lexer::getIntegerConstant() {
     if (std::isdigit(*ptr)) {
         core::types::IntegerBase base = core::types::IntegerBase::Decimal;
         std::string value, suffix_str;
@@ -171,30 +206,31 @@ std::optional<core::types::IntegerConstant> Lexer::getIntegerConstant() {
             }
         } else {
             while (std::isdigit(*ptr)) {
-                if (base == core::types::IntegerBase::Octal and not utils::isOctDigit(*ptr)) {
-                    // TODO: invalid octal integer constant
-                }
+                if (base == core::types::IntegerBase::Octal and not utils::isOctDigit(*ptr))
+                    return {std::nullopt, {Message::error(path_, line, col, "invalid octal integer constant")}};
                 value.push_back(*ptr);
                 adv();
             }
         }
 
         // parse suffix
+        auto suffix_start = tell();
         while (utils::isIdentifierChar(*ptr)) {
             suffix_str.push_back(*ptr);
             adv();
         }
         auto suffix = core::types::integerSuffixFromStr(suffix_str);
-        if (not suffix.has_value()) {
-            // TODO: invalid integer suffix
-        }
+        if (not suffix.has_value())
+            return {
+                std::nullopt,
+                {Message::error(path_, suffix_start.line, suffix_start.col, "invalid integer constant suffix")}};
 
-        return core::types::IntegerConstant{base, value, suffix.value()};
+        return {core::types::IntegerConstant{base, value, suffix.value()}, {}};
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::FloatingConstant> Lexer::getFloatingConstant() {
+Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
     // C89 only supports decimal floating constant
     auto start = tell();
     if (std::isdigit(*ptr) or (*ptr == '.' and std::isdigit(lookForward()))) {
@@ -220,11 +256,12 @@ std::optional<core::types::FloatingConstant> Lexer::getFloatingConstant() {
                     adv();
                 }
             } else {
-                // TODO: invalid floating constant
+                return {std::nullopt, {Message::error(path_, line, col, "invalid floating constant")}};
             }
         }
 
         // parse exponent
+        auto exp_start = tell();
         if (utils::hasExponent(*ptr, lookForward())) {
             is_float = true;
             value.push_back(*ptr);
@@ -240,35 +277,43 @@ std::optional<core::types::FloatingConstant> Lexer::getFloatingConstant() {
                 adv();
             }
             if (not has_exponent_digits) {
-                // TODO: invalid floating constant
+                return {
+                    std::nullopt,
+                    {Message::error(path_, exp_start.line, exp_start.col, "floating constant has no exponent digits")}};
             }
         }
+
         if (not is_float) {
             seek(start);
-            return std::nullopt;
+            return {std::nullopt, {}};
         }
 
         // parse suffix
+        auto suffix_start = tell();
         while (utils::isIdentifierChar(*ptr)) {
             suffix_str.push_back(*ptr);
             adv();
         }
         auto suffix = core::types::floatingSuffixFromStr(suffix_str);
-        if (not suffix.has_value()) {
-            // TODO: invalid floating suffix
-        }
+        if (not suffix.has_value())
+            return {
+                std::nullopt,
+                {Message::error(path_, suffix_start.line, suffix_start.col, "invalid floating constant suffix")}};
 
-        return core::types::FloatingConstant{value, suffix.value()};
+        return {core::types::FloatingConstant{value, suffix.value()}, {}};
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::CharacterConstant> Lexer::getCharacterConstant() {
+Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
+    auto start = tell();
     if (*ptr == '\'') {
         std::string value;
+        std::vector<Message> msg;
         adv();
         while (*ptr != '\'') {
             if (*ptr == '\\') {
+                auto esc_start = tell();
                 value.push_back(*ptr);
                 adv();
                 if (utils::isSimpleEscapeChar(*ptr)) {
@@ -278,17 +323,18 @@ std::optional<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                     std::intmax_t hex = 0;
                     value.push_back(*ptr);
                     adv();
-                    if (not std::isxdigit(*ptr)) {
-                        // TODO: invalid hexadecimal escape sequence
-                    }
+                    if (not std::isxdigit(*ptr))
+                        return {
+                            std::nullopt,
+                            {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")}};
                     while (std::isxdigit(*ptr)) {
                         hex = hex * 16 + utils::charToInt(*ptr);
                         value.push_back(*ptr);
                         adv();
                     }
-                    if (hex > std::numeric_limits<char>::max()) {
-                        // TODO: hex escape sequence out of range
-                    }
+                    if (hex > std::numeric_limits<char>::max())
+                        msg.push_back(
+                            Message::warning(path_, esc_start.line, esc_start.col, "hex escape sequence out of range"));
                 } else if (utils::isOctDigit(*ptr)) {
                     std::intmax_t oct = 0;
                     int count = 0;
@@ -298,33 +344,39 @@ std::optional<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                         adv();
                         count++;
                     }
-                    if (oct > std::numeric_limits<char>::max()) {
-                        // TODO: oct escape sequence out of range
-                    }
-                } else if (*ptr == '\n') {
-                    // TODO: missing closing single quote
+                    if (oct > std::numeric_limits<char>::max())
+                        msg.push_back(
+                            Message::warning(path_, esc_start.line, esc_start.col, "oct escape sequence out of range"));
+                } else if (*ptr == '\n' or *ptr == '\0') {
+                    return {
+                        std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
                 } else {
-                    // TODO: unknown escape sequence
+                    msg.push_back(Message::warning(path_, esc_start.line, esc_start.col, "unknown escape sequence"));
                     value.push_back(*ptr);
                     adv();
                 }
+            } else if (*ptr == '\n' or *ptr == '\0') {
+                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
             } else {
                 value.push_back(*ptr);
                 adv();
             }
         }
         adv();
-        return core::types::CharacterConstant{value};
+        return {core::types::CharacterConstant{value}, msg};
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::StringLiteral> Lexer::getStringLiteral() {
+Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
+    auto start = tell();
     if (*ptr == '"') {
         std::string value;
+        std::vector<Message> msg;
         adv();
         while (*ptr != '"') {
             if (*ptr == '\\') {
+                auto esc_start = tell();
                 value.push_back(*ptr);
                 adv();
                 if (utils::isSimpleEscapeChar(*ptr)) {
@@ -334,17 +386,18 @@ std::optional<core::types::StringLiteral> Lexer::getStringLiteral() {
                     std::intmax_t hex = 0;
                     value.push_back(*ptr);
                     adv();
-                    if (not std::isxdigit(*ptr)) {
-                        // TODO: invalid hexadecimal escape sequence
-                    }
+                    if (not std::isxdigit(*ptr))
+                        return {
+                            std::nullopt,
+                            {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")}};
                     while (std::isxdigit(*ptr)) {
                         hex = hex * 16 + utils::charToInt(*ptr);
                         value.push_back(*ptr);
                         adv();
                     }
-                    if (hex > std::numeric_limits<char>::max()) {
-                        // TODO: hex escape sequence out of range
-                    }
+                    if (hex > std::numeric_limits<char>::max())
+                        msg.push_back(
+                            Message::warning(path_, esc_start.line, esc_start.col, "hex escape sequence out of range"));
                 } else if (utils::isOctDigit(*ptr)) {
                     std::intmax_t oct = 0;
                     int count = 0;
@@ -354,28 +407,31 @@ std::optional<core::types::StringLiteral> Lexer::getStringLiteral() {
                         adv();
                         count++;
                     }
-                    if (oct > std::numeric_limits<char>::max()) {
-                        // TODO: oct escape sequence out of range
-                    }
-                } else if (*ptr == '\n') {
-                    // TODO: missing closing single quote
+                    if (oct > std::numeric_limits<char>::max())
+                        msg.push_back(
+                            Message::warning(path_, esc_start.line, esc_start.col, "oct escape sequence out of range"));
+                } else if (*ptr == '\n' or *ptr == '\0') {
+                    return {
+                        std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
                 } else {
-                    // TODO: unknown escape sequence
+                    msg.push_back(Message::warning(path_, esc_start.line, esc_start.col, "unknown escape sequence"));
                     value.push_back(*ptr);
                     adv();
                 }
+            } else if (*ptr == '\n' or *ptr == '\0') {
+                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
             } else {
                 value.push_back(*ptr);
                 adv();
             }
         }
         adv();
-        return core::types::StringLiteral{value};
+        return {core::types::StringLiteral{value}, msg};
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
-std::optional<core::types::Punctuation> Lexer::getPunctuation() {
+Lexer::Return<core::types::Punctuation> Lexer::getPunctuation() {
     std::string str;
     str.push_back(*ptr);
     if (char c = lookForward(); c != '\0')
@@ -386,11 +442,11 @@ std::optional<core::types::Punctuation> Lexer::getPunctuation() {
     while (not str.empty()) {
         if (auto punct = core::types::punctuationFromStr(str); punct.has_value()) {
             adv(str.size());
-            return punct;
+            return {punct, {}};
         }
         str.pop_back();
     }
-    return std::nullopt;
+    return {std::nullopt, {}};
 }
 
 }  // namespace cless::fend::lexer

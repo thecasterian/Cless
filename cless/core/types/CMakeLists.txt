@@ -8,6 +8,8 @@ set(TARGET_ALIAS cless::${LIBRARY_NAME}::${SUBLIBRARY_NAME})
 add_library(${TARGET} SHARED
     include/cless/core/types/exception.h
     src/exception.cpp
+    include/cless/core/types/message.h
+    src/message.cpp
     include/cless/core/types/token.h
     src/token.cpp
 )

@@ -9,7 +9,18 @@ int main(int argc, char* argv[]) {
     }
 
     cless::fend::lexer::Lexer lexer(argv[1]);
-    while (auto token = lexer.next()) {
-        std::cout << token.value() << std::endl;
+    while (true) {
+        auto token = lexer.next();
+        bool has_error = false;
+        for (const auto& msg : token.msg) {
+            std::cerr << msg << std::endl;
+            if (msg.type == cless::core::types::Message::Type::Error)
+                has_error = true;
+        }
+        if (has_error)
+            return EXIT_FAILURE;
+        if (not token.ret.has_value())
+            break;
+        std::cout << token.ret.value() << std::endl;
     }
 }

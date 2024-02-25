@@ -1,6 +1,9 @@
 #ifndef CLESS_FRONT_END_LEXER_LEXER_H
 #define CLESS_FRONT_END_LEXER_LEXER_H
 
+#include <vector>
+
+#include "cless/core/types/message.h"
 #include "cless/core/types/token.h"
 
 namespace cless::fend::lexer {
@@ -14,7 +17,13 @@ class Lexer {
 public:
     Lexer(std::string path);
 
-    std::optional<core::types::Token> next();
+    template <typename T>
+    struct Return {
+        std::optional<T> ret;
+        std::vector<core::types::Message> msg;
+    };
+
+    Return<core::types::Token> next();
 
     const std::string &path() const;
 
@@ -31,14 +40,14 @@ private:
     void seek(const Position &pos);
 
     void skipWhitespacesAndComments();
-    std::optional<core::types::PreprocessingToken> nextPreprocessingToken();
-    std::optional<core::types::HeaderName> getHeaderName();
-    std::optional<core::types::Identifier> getIdentifier();
-    std::optional<core::types::IntegerConstant> getIntegerConstant();
-    std::optional<core::types::FloatingConstant> getFloatingConstant();
-    std::optional<core::types::CharacterConstant> getCharacterConstant();
-    std::optional<core::types::StringLiteral> getStringLiteral();
-    std::optional<core::types::Punctuation> getPunctuation();
+    Return<core::types::PreprocessingToken> nextPreprocessingToken();
+    Return<core::types::HeaderName> getHeaderName();
+    Return<core::types::Identifier> getIdentifier();
+    Return<core::types::IntegerConstant> getIntegerConstant();
+    Return<core::types::FloatingConstant> getFloatingConstant();
+    Return<core::types::CharacterConstant> getCharacterConstant();
+    Return<core::types::StringLiteral> getStringLiteral();
+    Return<core::types::Punctuation> getPunctuation();
 };
 
 }  // namespace cless::fend::lexer
