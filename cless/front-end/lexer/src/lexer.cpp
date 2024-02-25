@@ -3,6 +3,7 @@
 #include <fstream>
 #include <limits>
 
+#include "cless/core/print/ansi_escape.h"
 #include "cless/front-end/lexer/utils.h"
 
 namespace cless::fend::lexer {
@@ -12,8 +13,10 @@ using core::types::Token;
 
 Lexer::Lexer(std::string path) : path_(std::move(path)) {
     std::ifstream file(path_);
-    if (!file.is_open()) {
-        throw std::runtime_error("File not found");
+    if (not file.is_open()) {
+        std::cerr << core::print::Bold << "cless: " << core::print::Red << "error:" << core::print::Reset
+                  << " cannot find " << path_ << ": no such file" << std::endl;
+        std::exit(EXIT_FAILURE);
     }
 
     source = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -36,6 +39,8 @@ const std::string& Lexer::path() const {
 
 void Lexer::adv(std::size_t n) {
     for (std::size_t i = 0; i < n; i++) {
+        if (*ptr == '\0')
+            break;
         if (*ptr == '\n') {
             line++;
             col = 0;
@@ -79,7 +84,7 @@ void Lexer::skipWhitespacesAndComments() {
             adv();
         } else if (*ptr == '/' and lookForward() == '/') {
             adv(2);
-            while (*ptr != '\n')
+            while (not utils::isEndOfLineChar(*ptr))
                 adv();
             adv();
         } else if (*ptr == '/' and lookForward() == '*') {
@@ -146,7 +151,7 @@ Lexer::Return<core::types::HeaderName> Lexer::getHeaderName() {
         std::string name;
         adv();
         while (*ptr != '>') {
-            if (*ptr == '\n' or *ptr == '\0')
+            if (utils::isEndOfLineChar(*ptr))
                 return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing angle bracket")}};
             name.push_back(*ptr);
             adv();
@@ -157,7 +162,7 @@ Lexer::Return<core::types::HeaderName> Lexer::getHeaderName() {
         std::string name;
         adv();
         while (*ptr != '"') {
-            if (*ptr == '\n' or *ptr == '\0')
+            if (utils::isEndOfLineChar(*ptr))
                 return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
             name.push_back(*ptr);
             adv();
@@ -347,7 +352,7 @@ Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                     if (oct > std::numeric_limits<char>::max())
                         msg.push_back(
                             Message::warning(path_, esc_start.line, esc_start.col, "oct escape sequence out of range"));
-                } else if (*ptr == '\n' or *ptr == '\0') {
+                } else if (utils::isEndOfLineChar(*ptr)) {
                     return {
                         std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
                 } else {
@@ -355,7 +360,7 @@ Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                     value.push_back(*ptr);
                     adv();
                 }
-            } else if (*ptr == '\n' or *ptr == '\0') {
+            } else if (utils::isEndOfLineChar(*ptr)) {
                 return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
             } else {
                 value.push_back(*ptr);
@@ -410,7 +415,7 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
                     if (oct > std::numeric_limits<char>::max())
                         msg.push_back(
                             Message::warning(path_, esc_start.line, esc_start.col, "oct escape sequence out of range"));
-                } else if (*ptr == '\n' or *ptr == '\0') {
+                } else if (utils::isEndOfLineChar(*ptr)) {
                     return {
                         std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
                 } else {
@@ -418,7 +423,7 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
                     value.push_back(*ptr);
                     adv();
                 }
-            } else if (*ptr == '\n' or *ptr == '\0') {
+            } else if (utils::isEndOfLineChar(*ptr)) {
                 return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
             } else {
                 value.push_back(*ptr);
@@ -434,10 +439,11 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
 Lexer::Return<core::types::Punctuation> Lexer::getPunctuation() {
     std::string str;
     str.push_back(*ptr);
-    if (char c = lookForward(); c != '\0')
+    if (char c = lookForward(); std::ispunct(c)) {
         str.push_back(c);
-    if (char c = lookForward(2); c != '\0')
-        str.push_back(c);
+        if (char c = lookForward(2); std::ispunct(c))
+            str.push_back(c);
+    }
 
     while (not str.empty()) {
         if (auto punct = core::types::punctuationFromStr(str); punct.has_value()) {

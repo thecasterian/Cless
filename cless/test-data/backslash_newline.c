@@ -6,4 +6,9 @@ in() {
 t';
     const char *c = "str\
 ing";
+    // comment \
+    continued comment
+    /\
+* also comment *\
+/
 }

@@ -1,11 +1,13 @@
 #include <iostream>
 
+#include "cless/core/print/ansi_escape.h"
 #include "cless/front-end/lexer/lexer.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <file>" << std::endl;
-        return EXIT_FAILURE;
+        std::cerr << cless::core::print::Bold << "cless: " << cless::core::print::Red
+                  << "error:" << cless::core::print::Reset << " no input file" << std::endl;
+        std::exit(EXIT_FAILURE);
     }
 
     cless::fend::lexer::Lexer lexer(argv[1]);

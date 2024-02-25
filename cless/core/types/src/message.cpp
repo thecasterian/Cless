@@ -1,5 +1,7 @@
 #include "cless/core/types/message.h"
 
+#include "cless/core/print/ansi_escape.h"
+
 namespace cless::core::types {
 
 Message Message::note(std::string file, std::size_t line, std::size_t column, std::string message) {
@@ -15,19 +17,19 @@ Message Message::error(std::string file, std::size_t line, std::size_t column, s
 }
 
 std::ostream &operator<<(std::ostream &os, const Message &msg) {
-    os << "\033[1m" << msg.file << ":" << msg.line << ":" << msg.column << ": ";
+    os << print::Bold << msg.file << ":" << msg.line << ":" << msg.column << ": ";
     switch (msg.type) {
         case Message::Type::Note:
-            os << "\033[1;34mnote: \033[0m";
+            os << print::Cyan << "note:";
             break;
         case Message::Type::Warning:
-            os << "\033[1;35mwarning: \033[0m";
+            os << print::Magenta << "warning:";
             break;
         case Message::Type::Error:
-            os << "\033[1;31merror: \033[0m";
+            os << print::Red << "error:";
             break;
     }
-    os << msg.message;
+    os << print::Reset << " " << msg.message;
     return os;
 }
 

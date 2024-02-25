@@ -49,6 +49,10 @@ std::intmax_t charToInt(char c) {
     throw core::types::Exception("Invalid digit");
 }
 
+bool isEndOfLineChar(char c) {
+    return c == '\n' or c == '\0';
+}
+
 bool isIdentifierChar(char c) {
     return std::isalnum(c) or c == '_';
 }

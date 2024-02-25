@@ -8,6 +8,7 @@
 namespace cless::fend::lexer::utils {
 
 std::intmax_t charToInt(char c);
+bool isEndOfLineChar(char c);
 
 bool isIdentifierChar(char c);
 bool isIdentifierStartChar(char c);
