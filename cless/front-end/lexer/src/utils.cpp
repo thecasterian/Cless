@@ -65,8 +65,8 @@ bool isHexBaseChar(char c) {
     return c == 'x' or c == 'X';
 }
 
-bool hasBase(char curr, char next) {
-    return curr == '0' and (isHexBaseChar(next) or std::isdigit(next));
+bool hasBase(char curr, char next, char next_next) {
+    return (curr == '0' and std::isdigit(next)) or (curr == '0' and isHexBaseChar(next) and std::isxdigit(next_next));
 }
 
 bool isOctDigit(char c) {
@@ -101,6 +101,32 @@ bool isSimpleEscapeChar(char c) {
             return true;
         default:
             return false;
+    }
+}
+
+char simpleEscape(char c) {
+    switch (c) {
+        case '\'':
+        case '"':
+        case '?':
+        case '\\':
+            return c;
+        case 'a':
+            return '\a';
+        case 'b':
+            return '\b';
+        case 'f':
+            return '\f';
+        case 'n':
+            return '\n';
+        case 'r':
+            return '\r';
+        case 't':
+            return '\t';
+        case 'v':
+            return '\v';
+        default:
+            throw core::types::Exception("Invalid simple escape sequence");
     }
 }
 

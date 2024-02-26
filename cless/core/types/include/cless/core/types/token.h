@@ -1,6 +1,7 @@
 #ifndef CLESS_CORE_TYPES_TOKEN_H
 #define CLESS_CORE_TYPES_TOKEN_H
 
+#include <cstdint>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -117,18 +118,8 @@ enum class IntegerSuffix {
 std::string toString(IntegerSuffix int_suffix);
 std::optional<IntegerSuffix> integerSuffixFromStr(const std::string& str);
 
-enum class IntegerBase {
-    Decimal,
-    Octal,
-    Hexadecimal,
-};
-
-std::string toString(IntegerBase int_base);
-std::optional<IntegerBase> integerBaseFromStr(const std::string& str);
-
 struct IntegerConstant {
-    IntegerBase base;
-    std::string value;
+    std::intmax_t value;
     IntegerSuffix suffix;
 };
 
@@ -142,12 +133,12 @@ std::string toString(FloatingSuffix float_suffix);
 std::optional<FloatingSuffix> floatingSuffixFromStr(const std::string& str);
 
 struct FloatingConstant {
-    std::string value;
+    long double value;
     FloatingSuffix suffix;
 };
 
 struct CharacterConstant {
-    std::string value;
+    std::intmax_t value;
 };
 
 struct StringLiteral {

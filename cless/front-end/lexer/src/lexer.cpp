@@ -20,7 +20,8 @@ Lexer::Lexer(std::string path) : path_(std::move(path)) {
     }
 
     source = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    source.push_back('\0');
+    if (source.back() != '\n')
+        source.push_back('\n');
     ptr = &source[0];
     line = 1;
     col = 1;
@@ -189,36 +190,36 @@ Lexer::Return<core::types::Identifier> Lexer::getIdentifier() {
 
 Lexer::Return<core::types::IntegerConstant> Lexer::getIntegerConstant() {
     if (std::isdigit(*ptr)) {
-        core::types::IntegerBase base = core::types::IntegerBase::Decimal;
-        std::string value, suffix_str;
-
         // parse base
-        if (utils::hasBase(*ptr, lookForward())) {
+        utils::Base base = utils::Base::Decimal;
+        if (utils::hasBase(*ptr, lookForward(), lookForward(2))) {
             adv();
             if (utils::isHexBaseChar(*ptr)) {
-                base = core::types::IntegerBase::Hexadecimal;
+                base = utils::Base::Hexadecimal;
                 adv();
             } else {
-                base = core::types::IntegerBase::Octal;
+                base = utils::Base::Octal;
             }
         }
 
         // parse value
-        if (base == core::types::IntegerBase::Hexadecimal) {
+        std::intmax_t value = 0;
+        if (base == utils::Base::Hexadecimal) {
             while (std::isxdigit(*ptr)) {
-                value.push_back(*ptr);
+                value = value * 16 + utils::charToInt(*ptr);
                 adv();
             }
         } else {
             while (std::isdigit(*ptr)) {
-                if (base == core::types::IntegerBase::Octal and not utils::isOctDigit(*ptr))
-                    return {std::nullopt, {Message::error(path_, line, col, "invalid octal integer constant")}};
-                value.push_back(*ptr);
+                if (base == utils::Base::Octal and not utils::isOctDigit(*ptr))
+                    return {std::nullopt, {Message::error(path_, line, col, "invalid digit in octal constant")}};
+                value = value * (base == utils::Base::Octal ? 8 : 10) + utils::charToInt(*ptr);
                 adv();
             }
         }
 
         // parse suffix
+        std::string suffix_str;
         auto suffix_start = tell();
         while (utils::isIdentifierChar(*ptr)) {
             suffix_str.push_back(*ptr);
@@ -230,7 +231,7 @@ Lexer::Return<core::types::IntegerConstant> Lexer::getIntegerConstant() {
                 std::nullopt,
                 {Message::error(path_, suffix_start.line, suffix_start.col, "invalid integer constant suffix")}};
 
-        return {core::types::IntegerConstant{base, value, suffix.value()}, {}};
+        return {core::types::IntegerConstant{value, suffix.value()}, {}};
     }
     return {std::nullopt, {}};
 }
@@ -240,24 +241,24 @@ Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
     auto start = tell();
     if (std::isdigit(*ptr) or (*ptr == '.' and std::isdigit(lookForward()))) {
         bool is_float = false;
-        std::string value, suffix_str;
+        std::string value_str, suffix_str;
 
         // parse significand
         if (*ptr == '.')
             is_float = true;
-        value.push_back(*ptr);
+        value_str.push_back(*ptr);
         adv();
         while (std::isdigit(*ptr)) {
-            value.push_back(*ptr);
+            value_str.push_back(*ptr);
             adv();
         }
         if (*ptr == '.') {
             if (not is_float) {
                 is_float = true;
-                value.push_back(*ptr);
+                value_str.push_back(*ptr);
                 adv();
                 while (std::isdigit(*ptr)) {
-                    value.push_back(*ptr);
+                    value_str.push_back(*ptr);
                     adv();
                 }
             } else {
@@ -269,16 +270,16 @@ Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
         auto exp_start = tell();
         if (utils::hasExponent(*ptr, lookForward())) {
             is_float = true;
-            value.push_back(*ptr);
+            value_str.push_back(*ptr);
             adv();
             if (utils::isSignChar(*ptr)) {
-                value.push_back(*ptr);
+                value_str.push_back(*ptr);
                 adv();
             }
             bool has_exponent_digits = false;
             while (std::isdigit(*ptr)) {
                 has_exponent_digits = true;
-                value.push_back(*ptr);
+                value_str.push_back(*ptr);
                 adv();
             }
             if (not has_exponent_digits) {
@@ -305,7 +306,7 @@ Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
                 std::nullopt,
                 {Message::error(path_, suffix_start.line, suffix_start.col, "invalid floating constant suffix")}};
 
-        return {core::types::FloatingConstant{value, suffix.value()}, {}};
+        return {core::types::FloatingConstant{std::stold(value_str), suffix.value()}, {}};
     }
     return {std::nullopt, {}};
 }
@@ -313,20 +314,18 @@ Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
 Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
     auto start = tell();
     if (*ptr == '\'') {
-        std::string value;
+        std::string value_str;
         std::vector<Message> msg;
         adv();
         while (*ptr != '\'') {
             if (*ptr == '\\') {
                 auto esc_start = tell();
-                value.push_back(*ptr);
                 adv();
                 if (utils::isSimpleEscapeChar(*ptr)) {
-                    value.push_back(*ptr);
+                    value_str.push_back(utils::simpleEscape(*ptr));
                     adv();
                 } else if (*ptr == 'x') {
                     std::intmax_t hex = 0;
-                    value.push_back(*ptr);
                     adv();
                     if (not std::isxdigit(*ptr))
                         return {
@@ -334,40 +333,50 @@ Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                             {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")}};
                     while (std::isxdigit(*ptr)) {
                         hex = hex * 16 + utils::charToInt(*ptr);
-                        value.push_back(*ptr);
                         adv();
                     }
-                    if (hex > std::numeric_limits<char>::max())
+                    if (hex > std::numeric_limits<char>::max() or hex < std::numeric_limits<char>::min())
                         msg.push_back(
                             Message::warning(path_, esc_start.line, esc_start.col, "hex escape sequence out of range"));
+                    value_str.push_back(static_cast<char>(hex));
                 } else if (utils::isOctDigit(*ptr)) {
                     std::intmax_t oct = 0;
                     int count = 0;
                     while (utils::isOctDigit(*ptr) and count < 3) {
                         oct = oct * 8 + utils::charToInt(*ptr);
-                        value.push_back(*ptr);
                         adv();
                         count++;
                     }
-                    if (oct > std::numeric_limits<char>::max())
+                    if (oct > std::numeric_limits<char>::max() or oct < std::numeric_limits<char>::min())
                         msg.push_back(
                             Message::warning(path_, esc_start.line, esc_start.col, "oct escape sequence out of range"));
+                    value_str.push_back(static_cast<char>(oct));
                 } else if (utils::isEndOfLineChar(*ptr)) {
                     return {
                         std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
                 } else {
                     msg.push_back(Message::warning(path_, esc_start.line, esc_start.col, "unknown escape sequence"));
-                    value.push_back(*ptr);
+                    value_str.push_back(*ptr);
                     adv();
                 }
             } else if (utils::isEndOfLineChar(*ptr)) {
                 return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
             } else {
-                value.push_back(*ptr);
+                value_str.push_back(*ptr);
                 adv();
             }
         }
         adv();
+
+        if (value_str.size() == 0)
+            return {std::nullopt, {Message::error(path_, start.line, start.col, "empty character constant")}};
+        if (value_str.size() > 1)
+            msg.push_back(Message::warning(path_, start.line, start.col, "multi-character character constant"));
+
+        std::intmax_t value = 0;
+        for (char c : value_str)
+            value = value * 256 + c;
+
         return {core::types::CharacterConstant{value}, msg};
     }
     return {std::nullopt, {}};
@@ -382,14 +391,12 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
         while (*ptr != '"') {
             if (*ptr == '\\') {
                 auto esc_start = tell();
-                value.push_back(*ptr);
                 adv();
                 if (utils::isSimpleEscapeChar(*ptr)) {
-                    value.push_back(*ptr);
+                    value.push_back(utils::simpleEscape(*ptr));
                     adv();
                 } else if (*ptr == 'x') {
                     std::intmax_t hex = 0;
-                    value.push_back(*ptr);
                     adv();
                     if (not std::isxdigit(*ptr))
                         return {
@@ -397,34 +404,34 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
                             {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")}};
                     while (std::isxdigit(*ptr)) {
                         hex = hex * 16 + utils::charToInt(*ptr);
-                        value.push_back(*ptr);
                         adv();
                     }
-                    if (hex > std::numeric_limits<char>::max())
+                    if (hex > std::numeric_limits<char>::max() or hex < std::numeric_limits<char>::min())
                         msg.push_back(
                             Message::warning(path_, esc_start.line, esc_start.col, "hex escape sequence out of range"));
+                    value.push_back(static_cast<char>(hex));
                 } else if (utils::isOctDigit(*ptr)) {
                     std::intmax_t oct = 0;
                     int count = 0;
                     while (utils::isOctDigit(*ptr) and count < 3) {
                         oct = oct * 8 + utils::charToInt(*ptr);
-                        value.push_back(*ptr);
                         adv();
                         count++;
                     }
-                    if (oct > std::numeric_limits<char>::max())
+                    if (oct > std::numeric_limits<char>::max() or oct < std::numeric_limits<char>::min())
                         msg.push_back(
                             Message::warning(path_, esc_start.line, esc_start.col, "oct escape sequence out of range"));
+                    value.push_back(static_cast<char>(oct));
                 } else if (utils::isEndOfLineChar(*ptr)) {
                     return {
-                        std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
+                        std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
                 } else {
                     msg.push_back(Message::warning(path_, esc_start.line, esc_start.col, "unknown escape sequence"));
                     value.push_back(*ptr);
                     adv();
                 }
             } else if (utils::isEndOfLineChar(*ptr)) {
-                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
+                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
             } else {
                 value.push_back(*ptr);
                 adv();

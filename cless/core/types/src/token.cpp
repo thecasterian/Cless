@@ -170,30 +170,6 @@ std::optional<IntegerSuffix> integerSuffixFromStr(const std::string &str) {
         return std::nullopt;
 }
 
-std::string toString(IntegerBase int_base) {
-    switch (int_base) {
-        case IntegerBase::Decimal:
-            return "";
-        case IntegerBase::Octal:
-            return "0";
-        case IntegerBase::Hexadecimal:
-            return "0x";
-    }
-
-    throw Exception("Unknown integer base");
-}
-
-std::optional<IntegerBase> integerBaseFromStr(const std::string &str) {
-    if (str == "")
-        return IntegerBase::Decimal;
-    else if (str == "0")
-        return IntegerBase::Octal;
-    else if (str == "0x" or str == "0X")
-        return IntegerBase::Hexadecimal;
-    else
-        return std::nullopt;
-}
-
 std::string toString(FloatingSuffix float_suffix) {
     switch (float_suffix) {
         case FloatingSuffix::None:
@@ -236,7 +212,7 @@ struct TokenToStringVisitor {
     }
 
     std::string operator()(const CharacterConstant &char_const) const {
-        return std::format("Character('{}')", char_const.value);
+        return std::format("Character({})", char_const.value);
     }
 
     std::string operator()(const StringLiteral &string_literal) const {
