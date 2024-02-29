@@ -4,12 +4,13 @@
 #include <limits>
 
 #include "cless/core/print/ansi_escape.h"
+#include "cless/core/types/exception.h"
 #include "cless/front-end/lexer/utils.h"
 
 namespace cless::fend::lexer {
 using core::types::Message;
-using core::types::PreprocessingToken;
-using core::types::Token;
+using syntax::token::PreprocessingToken;
+using syntax::token::Token;
 
 Lexer::Lexer(std::string path) : path_(std::move(path)) {
     std::ifstream file(path_);
@@ -27,11 +28,13 @@ Lexer::Lexer(std::string path) : path_(std::move(path)) {
     col = 1;
 }
 
-Lexer::Return<core::types::Token> Lexer::next() {
+Lexer::Return<Token> Lexer::next() {
     auto pp_token = nextPreprocessingToken();
-    if (pp_token.ret.has_value())
-        return {core::types::toToken(pp_token.ret.value()), pp_token.msg};
-    return {std::nullopt, pp_token.msg};
+    if (pp_token.error)
+        return {std::nullopt, std::move(pp_token.msg), true};
+    if (pp_token.tok.has_value())
+        return {syntax::token::toToken(pp_token.tok.value()), pp_token.msg, false};
+    return {std::nullopt, pp_token.msg, false};
 }
 
 const std::string& Lexer::path() const {
@@ -102,79 +105,75 @@ void Lexer::skipWhitespacesAndComments() {
 Lexer::Return<PreprocessingToken> Lexer::nextPreprocessingToken() {
     skipWhitespacesAndComments();
 
-    std::size_t start_line = line, start_col = col;
-    if (auto ident = getIdentifier(); ident.ret.has_value() or ident.msg.size() > 0) {
-        if (ident.ret.has_value())
-            return {
-                PreprocessingToken(ident.ret.value(), path_, start_line, start_col, line, col), std::move(ident.msg)};
-        return {std::nullopt, std::move(ident.msg)};
+    if (auto ident = getIdentifier(); ident.tok.has_value() or ident.error) {
+        if (ident.error)
+            return {std::nullopt, std::move(ident.msg), true};
+        return {ident.tok.value(), std::move(ident.msg), false};
     }
-    if (auto punct = getPunctuation(); punct.ret.has_value() or punct.msg.size() > 0) {
-        if (punct.ret.has_value())
-            return {
-                PreprocessingToken(punct.ret.value(), path_, start_line, start_col, line, col), std::move(punct.msg)};
-        return {std::nullopt, std::move(punct.msg)};
+    if (auto punct = getPunctuation(); punct.tok.has_value() or punct.error) {
+        if (punct.error)
+            return {std::nullopt, std::move(punct.msg), true};
+        return {punct.tok.value(), std::move(punct.msg), false};
     }
-    if (auto float_const = getFloatingConstant(); float_const.ret.has_value() or float_const.msg.size() > 0) {
-        if (float_const.ret.has_value())
-            return {
-                PreprocessingToken(float_const.ret.value(), path_, start_line, start_col, line, col),
-                std::move(float_const.msg)};
-        return {std::nullopt, std::move(float_const.msg)};
+    if (auto float_const = getFloatingConstant(); float_const.tok.has_value() or float_const.error) {
+        if (float_const.error)
+            return {std::nullopt, std::move(float_const.msg), true};
+        return {float_const.tok.value(), std::move(float_const.msg), false};
     }
-    if (auto int_const = getIntegerConstant(); int_const.ret.has_value() or int_const.msg.size() > 0) {
-        if (int_const.ret.has_value())
-            return {
-                PreprocessingToken(int_const.ret.value(), path_, start_line, start_col, line, col),
-                std::move(int_const.msg)};
-        return {std::nullopt, std::move(int_const.msg)};
+    if (auto int_const = getIntegerConstant(); int_const.tok.has_value() or int_const.error) {
+        if (int_const.error)
+            return {std::nullopt, std::move(int_const.msg), true};
+        return {int_const.tok.value(), std::move(int_const.msg), false};
     }
-    if (auto char_const = getCharacterConstant(); char_const.ret.has_value() or char_const.msg.size() > 0) {
-        if (char_const.ret.has_value())
-            return {
-                PreprocessingToken(char_const.ret.value(), path_, start_line, start_col, line, col),
-                std::move(char_const.msg)};
-        return {std::nullopt, std::move(char_const.msg)};
+    if (auto char_const = getCharacterConstant(); char_const.tok.has_value() or char_const.error) {
+        if (char_const.error)
+            return {std::nullopt, std::move(char_const.msg), true};
+        return {char_const.tok.value(), std::move(char_const.msg), false};
     }
-    if (auto str_lit = getStringLiteral(); str_lit.ret.has_value() or str_lit.msg.size() > 0) {
-        if (str_lit.ret.has_value())
-            return {
-                PreprocessingToken(str_lit.ret.value(), path_, start_line, start_col, line, col),
-                std::move(str_lit.msg)};
-        return {std::nullopt, std::move(str_lit.msg)};
+    if (auto str_lit = getStringLiteral(); str_lit.tok.has_value() or str_lit.error) {
+        if (str_lit.error)
+            return {std::nullopt, std::move(str_lit.msg), true};
+        return {str_lit.tok.value(), std::move(str_lit.msg), false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::HeaderName> Lexer::getHeaderName() {
+Lexer::Return<PreprocessingToken> Lexer::getHeaderName() {
     auto start = tell();
     if (*ptr == '<') {
         std::string name;
         adv();
         while (*ptr != '>') {
             if (utils::isEndOfLineChar(*ptr))
-                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing angle bracket")}};
+                return {
+                    std::nullopt,
+                    {Message::error(path_, start.line, start.col, "missing closing angle bracket")},
+                    true};
             name.push_back(*ptr);
             adv();
         }
         adv();
-        return {core::types::HeaderName{name, true}, {}};
+        auto end = tell();
+        return {syntax::token::HeaderName(name, true, path_, start.line, end.line, start.col, end.col), {}, false};
     } else if (*ptr == '"') {
         std::string name;
         adv();
         while (*ptr != '"') {
             if (utils::isEndOfLineChar(*ptr))
-                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}};
+                return {
+                    std::nullopt, {Message::error(path_, start.line, start.col, "missing closing double quote")}, true};
             name.push_back(*ptr);
             adv();
         }
         adv();
-        return {core::types::HeaderName{name, false}, {}};
+        auto end = tell();
+        return {syntax::token::HeaderName(name, false, path_, start.line, end.line, start.col, end.col), {}, false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::Identifier> Lexer::getIdentifier() {
+Lexer::Return<PreprocessingToken> Lexer::getIdentifier() {
+    auto start = tell();
     if (utils::isIdentifierStartChar(*ptr)) {
         std::string name;
         name.push_back(*ptr);
@@ -183,19 +182,24 @@ Lexer::Return<core::types::Identifier> Lexer::getIdentifier() {
             name.push_back(*ptr);
             adv();
         }
-        return {core::types::Identifier{name}, {}};
+        auto end = tell();
+        return {syntax::token::Identifier(name, path_, start.line, end.line, start.col, end.col), {}, false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::IntegerConstant> Lexer::getIntegerConstant() {
+Lexer::Return<PreprocessingToken> Lexer::getIntegerConstant() {
+    auto start = tell();
     if (std::isdigit(*ptr)) {
+        std::string source;
         // parse base
         utils::Base base = utils::Base::Decimal;
         if (utils::hasBase(*ptr, lookForward(), lookForward(2))) {
+            source.push_back(*ptr);
             adv();
             if (utils::isHexBaseChar(*ptr)) {
                 base = utils::Base::Hexadecimal;
+                source.push_back(*ptr);
                 adv();
             } else {
                 base = utils::Base::Octal;
@@ -207,13 +211,15 @@ Lexer::Return<core::types::IntegerConstant> Lexer::getIntegerConstant() {
         if (base == utils::Base::Hexadecimal) {
             while (std::isxdigit(*ptr)) {
                 value = value * 16 + utils::charToInt(*ptr);
+                source.push_back(*ptr);
                 adv();
             }
         } else {
             while (std::isdigit(*ptr)) {
                 if (base == utils::Base::Octal and not utils::isOctDigit(*ptr))
-                    return {std::nullopt, {Message::error(path_, line, col, "invalid digit in octal constant")}};
+                    return {std::nullopt, {Message::error(path_, line, col, "invalid digit in octal constant")}, true};
                 value = value * (base == utils::Base::Octal ? 8 : 10) + utils::charToInt(*ptr);
+                source.push_back(*ptr);
                 adv();
             }
         }
@@ -223,46 +229,58 @@ Lexer::Return<core::types::IntegerConstant> Lexer::getIntegerConstant() {
         auto suffix_start = tell();
         while (utils::isIdentifierChar(*ptr)) {
             suffix_str.push_back(*ptr);
+            source.push_back(*ptr);
             adv();
         }
-        auto suffix = core::types::integerSuffixFromStr(suffix_str);
+        auto suffix = syntax::token::integerSuffixFromStr(suffix_str);
         if (not suffix.has_value())
             return {
                 std::nullopt,
-                {Message::error(path_, suffix_start.line, suffix_start.col, "invalid integer constant suffix")}};
+                {Message::error(path_, suffix_start.line, suffix_start.col, "invalid integer constant suffix")},
+                true};
 
-        return {core::types::IntegerConstant{value, suffix.value()}, {}};
+        auto end = tell();
+        return {
+            syntax::token::IntegerConstant(
+                value, suffix.value(), std::move(source), path_, start.line, end.line, start.col, end.col),
+            {},
+            false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
+Lexer::Return<PreprocessingToken> Lexer::getFloatingConstant() {
     // C89 only supports decimal floating constant
     auto start = tell();
     if (std::isdigit(*ptr) or (*ptr == '.' and std::isdigit(lookForward()))) {
         bool is_float = false;
         std::string value_str, suffix_str;
+        std::string source;
 
         // parse significand
         if (*ptr == '.')
             is_float = true;
         value_str.push_back(*ptr);
+        source.push_back(*ptr);
         adv();
         while (std::isdigit(*ptr)) {
             value_str.push_back(*ptr);
+            source.push_back(*ptr);
             adv();
         }
         if (*ptr == '.') {
             if (not is_float) {
                 is_float = true;
                 value_str.push_back(*ptr);
+                source.push_back(*ptr);
                 adv();
                 while (std::isdigit(*ptr)) {
                     value_str.push_back(*ptr);
+                    source.push_back(*ptr);
                     adv();
                 }
             } else {
-                return {std::nullopt, {Message::error(path_, line, col, "invalid floating constant")}};
+                return {std::nullopt, {Message::error(path_, line, col, "invalid floating constant")}, true};
             }
         }
 
@@ -271,68 +289,93 @@ Lexer::Return<core::types::FloatingConstant> Lexer::getFloatingConstant() {
         if (utils::hasExponent(*ptr, lookForward())) {
             is_float = true;
             value_str.push_back(*ptr);
+            source.push_back(*ptr);
             adv();
             if (utils::isSignChar(*ptr)) {
                 value_str.push_back(*ptr);
+                source.push_back(*ptr);
                 adv();
             }
             bool has_exponent_digits = false;
             while (std::isdigit(*ptr)) {
                 has_exponent_digits = true;
                 value_str.push_back(*ptr);
+                source.push_back(*ptr);
                 adv();
             }
             if (not has_exponent_digits) {
                 return {
                     std::nullopt,
-                    {Message::error(path_, exp_start.line, exp_start.col, "floating constant has no exponent digits")}};
+                    {Message::error(path_, exp_start.line, exp_start.col, "floating constant has no exponent digits")},
+                    true};
             }
         }
 
         if (not is_float) {
             seek(start);
-            return {std::nullopt, {}};
+            return {std::nullopt, {}, false};
         }
 
         // parse suffix
         auto suffix_start = tell();
         while (utils::isIdentifierChar(*ptr)) {
             suffix_str.push_back(*ptr);
+            source.push_back(*ptr);
             adv();
         }
-        auto suffix = core::types::floatingSuffixFromStr(suffix_str);
+        auto suffix = syntax::token::floatingSuffixFromStr(suffix_str);
         if (not suffix.has_value())
             return {
                 std::nullopt,
-                {Message::error(path_, suffix_start.line, suffix_start.col, "invalid floating constant suffix")}};
+                {Message::error(path_, suffix_start.line, suffix_start.col, "invalid floating constant suffix")},
+                true};
 
-        return {core::types::FloatingConstant{std::stold(value_str), suffix.value()}, {}};
+        auto end = tell();
+        return {
+            syntax::token::FloatingConstant(
+                std::stold(value_str),
+                suffix.value(),
+                std::move(source),
+                path_,
+                start.line,
+                end.line,
+                start.col,
+                end.col),
+            {},
+            false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
+Lexer::Return<PreprocessingToken> Lexer::getCharacterConstant() {
     auto start = tell();
     if (*ptr == '\'') {
         std::string value_str;
+        std::string source;
         std::vector<Message> msg;
+
         adv();
         while (*ptr != '\'') {
             if (*ptr == '\\') {
                 auto esc_start = tell();
+                source.push_back(*ptr);
                 adv();
                 if (utils::isSimpleEscapeChar(*ptr)) {
                     value_str.push_back(utils::simpleEscape(*ptr));
+                    source.push_back(*ptr);
                     adv();
                 } else if (*ptr == 'x') {
                     std::intmax_t hex = 0;
+                    source.push_back(*ptr);
                     adv();
                     if (not std::isxdigit(*ptr))
                         return {
                             std::nullopt,
-                            {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")}};
+                            {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")},
+                            true};
                     while (std::isxdigit(*ptr)) {
                         hex = hex * 16 + utils::charToInt(*ptr);
+                        source.push_back(*ptr);
                         adv();
                     }
                     if (hex > std::numeric_limits<char>::max() or hex < std::numeric_limits<char>::min())
@@ -344,6 +387,7 @@ Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                     int count = 0;
                     while (utils::isOctDigit(*ptr) and count < 3) {
                         oct = oct * 8 + utils::charToInt(*ptr);
+                        source.push_back(*ptr);
                         adv();
                         count++;
                     }
@@ -353,23 +397,28 @@ Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
                     value_str.push_back(static_cast<char>(oct));
                 } else if (utils::isEndOfLineChar(*ptr)) {
                     return {
-                        std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
+                        std::nullopt,
+                        {Message::error(path_, start.line, start.col, "missing closing single quote")},
+                        true};
                 } else {
                     msg.push_back(Message::warning(path_, esc_start.line, esc_start.col, "unknown escape sequence"));
                     value_str.push_back(*ptr);
+                    source.push_back(*ptr);
                     adv();
                 }
             } else if (utils::isEndOfLineChar(*ptr)) {
-                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
+                return {
+                    std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}, true};
             } else {
                 value_str.push_back(*ptr);
+                source.push_back(*ptr);
                 adv();
             }
         }
         adv();
 
         if (value_str.size() == 0)
-            return {std::nullopt, {Message::error(path_, start.line, start.col, "empty character constant")}};
+            return {std::nullopt, {Message::error(path_, start.line, start.col, "empty character constant")}, true};
         if (value_str.size() > 1)
             msg.push_back(Message::warning(path_, start.line, start.col, "multi-character character constant"));
 
@@ -377,33 +426,44 @@ Lexer::Return<core::types::CharacterConstant> Lexer::getCharacterConstant() {
         for (char c : value_str)
             value = value * 256 + c;
 
-        return {core::types::CharacterConstant{value}, msg};
+        auto end = tell();
+        return {
+            syntax::token::CharacterConstant(value, std::move(source), path_, start.line, end.line, start.col, end.col),
+            msg,
+            false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
+Lexer::Return<PreprocessingToken> Lexer::getStringLiteral() {
     auto start = tell();
     if (*ptr == '"') {
         std::string value;
+        std::string source;
         std::vector<Message> msg;
+
         adv();
         while (*ptr != '"') {
             if (*ptr == '\\') {
                 auto esc_start = tell();
+                source.push_back(*ptr);
                 adv();
                 if (utils::isSimpleEscapeChar(*ptr)) {
                     value.push_back(utils::simpleEscape(*ptr));
+                    source.push_back(*ptr);
                     adv();
                 } else if (*ptr == 'x') {
                     std::intmax_t hex = 0;
+                    source.push_back(*ptr);
                     adv();
                     if (not std::isxdigit(*ptr))
                         return {
                             std::nullopt,
-                            {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")}};
+                            {Message::error(path_, line, col, "hex escape sequence has no hexadecimal digits")},
+                            true};
                     while (std::isxdigit(*ptr)) {
                         hex = hex * 16 + utils::charToInt(*ptr);
+                        source.push_back(*ptr);
                         adv();
                     }
                     if (hex > std::numeric_limits<char>::max() or hex < std::numeric_limits<char>::min())
@@ -415,6 +475,7 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
                     int count = 0;
                     while (utils::isOctDigit(*ptr) and count < 3) {
                         oct = oct * 8 + utils::charToInt(*ptr);
+                        source.push_back(*ptr);
                         adv();
                         count++;
                     }
@@ -424,26 +485,144 @@ Lexer::Return<core::types::StringLiteral> Lexer::getStringLiteral() {
                     value.push_back(static_cast<char>(oct));
                 } else if (utils::isEndOfLineChar(*ptr)) {
                     return {
-                        std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
+                        std::nullopt,
+                        {Message::error(path_, start.line, start.col, "missing closing single quote")},
+                        true};
                 } else {
                     msg.push_back(Message::warning(path_, esc_start.line, esc_start.col, "unknown escape sequence"));
                     value.push_back(*ptr);
+                    source.push_back(*ptr);
                     adv();
                 }
             } else if (utils::isEndOfLineChar(*ptr)) {
-                return {std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}};
+                return {
+                    std::nullopt, {Message::error(path_, start.line, start.col, "missing closing single quote")}, true};
             } else {
                 value.push_back(*ptr);
+                source.push_back(*ptr);
                 adv();
             }
         }
         adv();
-        return {core::types::StringLiteral{value}, msg};
+
+        auto end = tell();
+        return {
+            syntax::token::StringLiteral(value, std::move(source), path_, start.line, end.line, start.col, end.col),
+            msg,
+            false};
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
-Lexer::Return<core::types::Punctuation> Lexer::getPunctuation() {
+static PreprocessingToken buildPunctuation(
+    syntax::token::PunctuationType type,
+    const std::string& file,
+    size_t line_start,
+    size_t line_end,
+    size_t col_start,
+    size_t col_end) {
+    switch (type) {
+        case syntax::token::PunctuationType::DoubleLessThanEqual:
+            return syntax::token::DoubleLessThanEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleGreaterThanEqual:
+            return syntax::token::DoubleGreaterThanEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Ellipsis:
+            return syntax::token::Ellipsis(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Arrow:
+            return syntax::token::Arrow(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoublePlus:
+            return syntax::token::DoublePlus(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleMinus:
+            return syntax::token::DoubleMinus(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleLessThan:
+            return syntax::token::DoubleLessThan(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleGreaterThan:
+            return syntax::token::DoubleGreaterThan(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::LessThanEqual:
+            return syntax::token::LessThanEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::GreaterThanEqual:
+            return syntax::token::GreaterThanEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleEqual:
+            return syntax::token::DoubleEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::ExclamationEqual:
+            return syntax::token::ExclamationEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleAmpersand:
+            return syntax::token::DoubleAmpersand(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleVerticalBar:
+            return syntax::token::DoubleVerticalBar(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::AsteriskEqual:
+            return syntax::token::AsteriskEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::SlashEqual:
+            return syntax::token::SlashEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::PercentEqual:
+            return syntax::token::PercentEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::PlusEqual:
+            return syntax::token::PlusEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::MinusEqual:
+            return syntax::token::MinusEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::AmpersandEqual:
+            return syntax::token::AmpersandEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::CaretEqual:
+            return syntax::token::CaretEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::VerticalBarEqual:
+            return syntax::token::VerticalBarEqual(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::DoubleHash:
+            return syntax::token::DoubleHash(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::OpenBracket:
+            return syntax::token::OpenBracket(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::CloseBracket:
+            return syntax::token::CloseBracket(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::OpenParenthesis:
+            return syntax::token::OpenParenthesis(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::CloseParenthesis:
+            return syntax::token::CloseParenthesis(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::OpenBrace:
+            return syntax::token::OpenBrace(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::CloseBrace:
+            return syntax::token::CloseBrace(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Dot:
+            return syntax::token::Dot(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Ampersand:
+            return syntax::token::Ampersand(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Asterisk:
+            return syntax::token::Asterisk(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Plus:
+            return syntax::token::Plus(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Minus:
+            return syntax::token::Minus(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Tilde:
+            return syntax::token::Tilde(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Exclamation:
+            return syntax::token::Exclamation(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Slash:
+            return syntax::token::Slash(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Percent:
+            return syntax::token::Percent(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::LessThan:
+            return syntax::token::LessThan(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::GreaterThan:
+            return syntax::token::GreaterThan(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Caret:
+            return syntax::token::Caret(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::VerticalBar:
+            return syntax::token::VerticalBar(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Question:
+            return syntax::token::Question(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Colon:
+            return syntax::token::Colon(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Semicolon:
+            return syntax::token::Semicolon(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Equal:
+            return syntax::token::Equal(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Comma:
+            return syntax::token::Comma(file, line_start, line_end, col_start, col_end);
+        case syntax::token::PunctuationType::Hash:
+            return syntax::token::Hash(file, line_start, line_end, col_start, col_end);
+    }
+    throw core::types::Exception("Unknown punctuation type");
+}
+
+Lexer::Return<PreprocessingToken> Lexer::getPunctuation() {
     std::string str;
     str.push_back(*ptr);
     if (char c = lookForward(); std::ispunct(c)) {
@@ -452,14 +631,16 @@ Lexer::Return<core::types::Punctuation> Lexer::getPunctuation() {
             str.push_back(c);
     }
 
+    auto start = tell();
     while (not str.empty()) {
-        if (auto punct = core::types::punctuationFromStr(str); punct.has_value()) {
+        if (auto punct = syntax::token::punctuationTypeFromStr(str); punct.has_value()) {
             adv(str.size());
-            return {punct, {}};
+            auto end = tell();
+            return {buildPunctuation(punct.value(), path_, start.line, end.line, start.col, end.col), {}, false};
         }
         str.pop_back();
     }
-    return {std::nullopt, {}};
+    return {std::nullopt, {}, false};
 }
 
 }  // namespace cless::fend::lexer

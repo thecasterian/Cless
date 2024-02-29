@@ -10,8 +10,6 @@ add_library(${TARGET} SHARED
     src/exception.cpp
     include/cless/core/types/message.h
     src/message.cpp
-    include/cless/core/types/token.h
-    src/token.cpp
 )
 
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE CXX)

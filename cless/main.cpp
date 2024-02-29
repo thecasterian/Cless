@@ -13,16 +13,12 @@ int main(int argc, char* argv[]) {
     cless::fend::lexer::Lexer lexer(argv[1]);
     while (true) {
         auto token = lexer.next();
-        bool has_error = false;
-        for (const auto& msg : token.msg) {
+        for (const auto& msg : token.msg)
             std::cerr << msg << std::endl;
-            if (msg.type == cless::core::types::Message::Type::Error)
-                has_error = true;
-        }
-        if (has_error)
+        if (token.error)
             return EXIT_FAILURE;
-        if (not token.ret.has_value())
+        if (not token.tok.has_value())
             break;
-        std::cout << token.ret.value() << std::endl;
+        std::cout << token.tok.value() << std::endl;
     }
 }
