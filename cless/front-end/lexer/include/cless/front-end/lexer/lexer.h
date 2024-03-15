@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "cless/core/types/message.h"
-#include "cless/core/types/token.h"
+#include "cless/syntax/token/token.h"
 
 namespace cless::fend::lexer {
 
@@ -17,13 +17,14 @@ class Lexer {
 public:
     Lexer(std::string path);
 
-    template <typename T>
+    template <typename TokenType>
     struct Return {
-        std::optional<T> ret;
+        std::optional<TokenType> tok;
         std::vector<core::types::Message> msg;
+        bool error;
     };
 
-    Return<core::types::Token> next();
+    Return<syntax::token::Token> next();
 
     const std::string &path() const;
 
@@ -40,14 +41,14 @@ private:
     void seek(const Position &pos);
 
     void skipWhitespacesAndComments();
-    Return<core::types::PreprocessingToken> nextPreprocessingToken();
-    Return<core::types::HeaderName> getHeaderName();
-    Return<core::types::Identifier> getIdentifier();
-    Return<core::types::IntegerConstant> getIntegerConstant();
-    Return<core::types::FloatingConstant> getFloatingConstant();
-    Return<core::types::CharacterConstant> getCharacterConstant();
-    Return<core::types::StringLiteral> getStringLiteral();
-    Return<core::types::Punctuation> getPunctuation();
+    Return<syntax::token::PreprocessingToken> nextPreprocessingToken();
+    Return<syntax::token::PreprocessingToken> getHeaderName();
+    Return<syntax::token::PreprocessingToken> getIdentifier();
+    Return<syntax::token::PreprocessingToken> getIntegerConstant();
+    Return<syntax::token::PreprocessingToken> getFloatingConstant();
+    Return<syntax::token::PreprocessingToken> getCharacterConstant();
+    Return<syntax::token::PreprocessingToken> getStringLiteral();
+    Return<syntax::token::PreprocessingToken> getPunctuation();
 };
 
 }  // namespace cless::fend::lexer

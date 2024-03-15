@@ -17,6 +17,6 @@ target_include_directories(${TARGET} PUBLIC
     ${CMAKE_SOURCE_DIR}/cless/front-end/lexer/include
 )
 target_link_libraries(${TARGET} PUBLIC
-    cless::core::types
+    cless::syntax::token
 )
 add_library(${TARGET_ALIAS} ALIAS ${TARGET})
